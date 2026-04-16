@@ -36,6 +36,16 @@ export function checkAwsCli(): boolean {
 }
 
 export function checkSsmPlugin(): boolean {
+  // On Windows, use 'where.exe' for reliable detection
+  if (process.platform === 'win32') {
+    try {
+      execSync('where.exe session-manager-plugin', { stdio: 'pipe', timeout: 5000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   try {
     execSync('session-manager-plugin', { stdio: 'pipe', timeout: 5000 });
     return true;

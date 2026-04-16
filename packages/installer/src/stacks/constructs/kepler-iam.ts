@@ -6,6 +6,7 @@ import { Construct } from 'constructs';
 
 export interface KeplerIamProps {
   deploymentName: string;
+  region: string;
   stateBucketName: string;
   docsBucket: s3.IBucket;
   logGroup: logs.ILogGroup;
@@ -44,30 +45,36 @@ export class KeplerIam extends Construct {
     // S3 read/write on docs bucket
     props.docsBucket.grantReadWrite(role);
 
-    // Bedrock invoke (placeholder for future use)
+    // Bedrock invoke — scoped to deployment region
     role.addToPolicy(
       new iam.PolicyStatement({
         sid: 'BedrockInvoke',
         effect: iam.Effect.ALLOW,
         actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
-        resources: ['*'],
+        resources: [`arn:aws:bedrock:${props.region}:*:*`],
       }),
     );
 
     // CloudWatch Logs write
     props.logGroup.grantWrite(role);
 
-    // ECR pull (for pulling container images)
+    // ECR auth (requires resource '*')
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        sid: 'EcrAuth',
+        effect: iam.Effect.ALLOW,
+        actions: ['ecr:GetAuthorizationToken'],
+        resources: ['*'],
+      }),
+    );
+
+    // ECR pull — scoped to kepler repositories in deployment region
     role.addToPolicy(
       new iam.PolicyStatement({
         sid: 'EcrPull',
         effect: iam.Effect.ALLOW,
-        actions: [
-          'ecr:GetDownloadUrlForLayer',
-          'ecr:BatchGetImage',
-          'ecr:GetAuthorizationToken',
-        ],
-        resources: ['*'],
+        actions: ['ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage'],
+        resources: [`arn:aws:ecr:${props.region}:*:repository/kepler-*`],
       }),
     );
 

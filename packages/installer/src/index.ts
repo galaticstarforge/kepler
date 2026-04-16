@@ -1,2 +1,2 @@
 export type { DeploymentConfig, DeploymentOutputs } from './types.js';
-export { deploy, destroy, getStatus, getStackName } from './deployer.js';
+export { deploy, diff, destroy, getStatus, getStackName } from './deployer.js';

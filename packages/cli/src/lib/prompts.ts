@@ -1,9 +1,9 @@
 import { confirm, select, input } from '@inquirer/prompts';
 
-import { isJsonOutput } from './logger.js';
+import { isJsonOutput, isYesMode } from './logger.js';
 
 export async function promptConfirm(message: string, defaultValue = true): Promise<boolean> {
-  if (isJsonOutput()) {
+  if (isJsonOutput() || isYesMode()) {
     return defaultValue;
   }
   return confirm({ message, default: defaultValue });

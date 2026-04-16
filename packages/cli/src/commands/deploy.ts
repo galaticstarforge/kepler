@@ -1,8 +1,10 @@
 import {
   deploy,
+  diff,
   getStatus,
   type DeploymentConfig,
 } from '@kepler/installer';
+import { KEPLER_VERSION } from '@kepler/shared';
 import { Command } from 'commander';
 import ora from 'ora';
 
@@ -12,6 +14,7 @@ import { logger, handleError, output, isJsonOutput } from '../lib/logger.js';
 import { checkPrerequisites } from '../lib/prerequisites.js';
 import { promptConfirm, promptSelect } from '../lib/prompts.js';
 import { writeDeploymentConfig, recordHistoryEntry } from '../lib/state-bucket.js';
+import { validateDeploymentName } from '../lib/validation.js';
 
 const TIER_CHOICES = [
   { name: 'small  — t3.large, 100 GB (~$70/month)', value: 'small' as const },
@@ -31,6 +34,7 @@ export const deployCommand = new Command('deploy')
   .option('--vpc <strategy>', 'VPC strategy (create/default)')
   .action(async (deploymentName: string, options: { tier?: string; vpc?: string }) => {
     try {
+      validateDeploymentName(deploymentName);
       const { identity } = await checkPrerequisites({ requireSsmPlugin: true });
       const state = readLocalState();
       if (!state?.stateBucket) {
@@ -39,6 +43,7 @@ export const deployCommand = new Command('deploy')
 
       const region = state.region;
       const existingStatus = await getStatus(deploymentName, region);
+      let isUpdate = false;
 
       if (existingStatus) {
         const s = existingStatus.status;
@@ -59,6 +64,7 @@ export const deployCommand = new Command('deploy')
           await destroy(deploymentName, region, (msg) => { spinner.text = msg; });
           spinner.succeed('Old stack removed.');
         } else if (s === 'CREATE_COMPLETE' || s === 'UPDATE_COMPLETE') {
+          isUpdate = true;
           const update = await promptConfirm('Deployment exists. Update?');
           if (!update) {
             logger.info('Aborted.');
@@ -80,7 +86,7 @@ export const deployCommand = new Command('deploy')
         stateBucketName: state.stateBucket,
         instanceTier: tier,
         vpcStrategy,
-        keplerVersion: '0.0.1',
+        keplerVersion: KEPLER_VERSION,
       };
 
       if (!isJsonOutput()) {
@@ -90,6 +96,24 @@ export const deployCommand = new Command('deploy')
         logger.info(`  VPC:      ${vpcStrategy}`);
         logger.info(`  Region:   ${region}`);
         logger.info('');
+      }
+
+      // Show infrastructure diff for updates
+      if (isUpdate && !isJsonOutput()) {
+        const spinner = ora('Computing infrastructure diff...').start();
+        try {
+          const diffOutput = await diff(config, (msg: string) => { spinner.text = msg; });
+          spinner.stop();
+          if (diffOutput.trim()) {
+            logger.info('Infrastructure changes:');
+            process.stdout.write(diffOutput + '\n\n');
+          } else {
+            logger.info('No infrastructure changes detected.\n');
+          }
+        } catch {
+          spinner.stop();
+          logger.warn('Could not compute diff. Proceeding without preview.\n');
+        }
       }
 
       const confirmed = await promptConfirm('Proceed with deployment?');

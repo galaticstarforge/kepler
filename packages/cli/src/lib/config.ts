@@ -6,6 +6,12 @@ import YAML from 'yaml';
 
 const DEFAULT_REGION = 'us-east-1';
 
+let _regionOverride: string | undefined;
+
+export function setRegionOverride(region: string): void {
+  _regionOverride = region;
+}
+
 export interface LocalState {
   stateBucket: string;
   region: string;
@@ -24,6 +30,8 @@ function getStateFilePath(): string {
 }
 
 export function getRegion(): string {
+  if (_regionOverride) return _regionOverride;
+
   const envRegion = process.env['KEPLER_REGION'];
   if (envRegion) return envRegion;
 

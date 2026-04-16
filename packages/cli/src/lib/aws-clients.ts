@@ -1,4 +1,5 @@
 import { CloudFormationClient } from '@aws-sdk/client-cloudformation';
+import { CloudWatchLogsClient } from '@aws-sdk/client-cloudwatch-logs';
 import { EC2Client } from '@aws-sdk/client-ec2';
 import { IAMClient } from '@aws-sdk/client-iam';
 import { S3Client } from '@aws-sdk/client-s3';
@@ -13,6 +14,7 @@ let _ec2: EC2Client | undefined;
 let _ssm: SSMClient | undefined;
 let _sts: STSClient | undefined;
 let _iam: IAMClient | undefined;
+let _logs: CloudWatchLogsClient | undefined;
 
 export function getS3Client(): S3Client {
   if (!_s3) _s3 = new S3Client({ region: getRegion() });
@@ -42,4 +44,9 @@ export function getSTSClient(): STSClient {
 export function getIAMClient(): IAMClient {
   if (!_iam) _iam = new IAMClient({ region: getRegion() });
   return _iam;
+}
+
+export function getLogsClient(): CloudWatchLogsClient {
+  if (!_logs) _logs = new CloudWatchLogsClient({ region: getRegion() });
+  return _logs;
 }

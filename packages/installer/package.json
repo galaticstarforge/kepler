@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.700.0",
+    "@kepler/shared": "workspace:*",
     "aws-cdk-lib": "^2.170.0",
     "aws-cdk": "^2.170.0",
     "constructs": "^10.4.0",

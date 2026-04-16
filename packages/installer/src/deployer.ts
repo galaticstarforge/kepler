@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs';
-import { writeFile, mkdir, rm } from 'node:fs/promises';
+import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createApp } from './app.js';
 import type { DeploymentConfig, DeploymentOutputs } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -67,226 +68,10 @@ async function runCdk(
   return result.stdout;
 }
 
-async function prepareCdkApp(config: DeploymentConfig): Promise<string> {
-  const tmpDir = path.join(
-    process.env['TMPDIR'] || process.env['TEMP'] || '/tmp',
-    `kepler-cdk-${config.deploymentName}-${Date.now()}`,
-  );
-  await mkdir(tmpDir, { recursive: true });
-
-  // Write the CDK app as a self-contained script
-  const appCode = `
-import * as cdk from 'aws-cdk-lib';
-import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as logs from 'aws-cdk-lib/aws-logs';
-import * as iam from 'aws-cdk-lib/aws-iam';
-
-const config = ${JSON.stringify(config)};
-
-const INSTANCE_TIER_MAP = {
-  small: { instanceType: 't3.large', volumeSize: 100 },
-  medium: { instanceType: 'm7i.large', volumeSize: 200 },
-  large: { instanceType: 'm7i.2xlarge', volumeSize: 400 },
-};
-
-const app = new cdk.App();
-const tierConfig = INSTANCE_TIER_MAP[config.instanceTier] || INSTANCE_TIER_MAP.small;
-
-const stack = new cdk.Stack(app, 'kepler-' + config.deploymentName, {
-  env: { region: config.region },
-  description: 'Kepler deployment: ' + config.deploymentName,
-});
-
-cdk.Tags.of(stack).add('kepler:deployment', config.deploymentName);
-cdk.Tags.of(stack).add('kepler:managed', 'true');
-cdk.Tags.of(stack).add('kepler:version', config.keplerVersion);
-
-// VPC
-let vpc;
-if (config.vpcStrategy === 'existing' && config.existingVpcId) {
-  vpc = ec2.Vpc.fromLookup(stack, 'ExistingVpc', { vpcId: config.existingVpcId });
-} else if (config.vpcStrategy === 'default') {
-  vpc = ec2.Vpc.fromLookup(stack, 'DefaultVpc', { isDefault: true });
-} else {
-  vpc = new ec2.Vpc(stack, 'KeplerVpc', {
-    vpcName: 'kepler-' + config.deploymentName,
-    ipAddresses: ec2.IpAddresses.cidr('10.42.0.0/16'),
-    maxAzs: 1,
-    natGateways: 1,
-    subnetConfiguration: [
-      { name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
-      { name: 'Private', subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, cidrMask: 24 },
-    ],
-  });
-  cdk.Tags.of(vpc).add('kepler:deployment', config.deploymentName);
-  cdk.Tags.of(vpc).add('kepler:managed', 'true');
-}
-
-// Storage
-const docsBucket = new s3.Bucket(stack, 'DocsBucket', {
-  versioned: true,
-  encryption: s3.BucketEncryption.S3_MANAGED,
-  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
-  autoDeleteObjects: true,
-  lifecycleRules: [{ noncurrentVersionExpiration: cdk.Duration.days(30) }],
-});
-cdk.Tags.of(docsBucket).add('kepler:deployment', config.deploymentName);
-cdk.Tags.of(docsBucket).add('kepler:managed', 'true');
-
-const logGroup = new logs.LogGroup(stack, 'LogGroup', {
-  logGroupName: '/kepler/' + config.deploymentName,
-  retention: logs.RetentionDays.ONE_MONTH,
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
-});
-
-// IAM
-const role = new iam.Role(stack, 'InstanceRole', {
-  roleName: 'kepler-instance-' + config.deploymentName,
-  assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
-  description: 'Kepler instance role for deployment ' + config.deploymentName,
-});
-role.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'));
-role.addToPolicy(new iam.PolicyStatement({
-  sid: 'StateBucketRead',
-  effect: iam.Effect.ALLOW,
-  actions: ['s3:GetObject', 's3:ListBucket'],
-  resources: ['arn:aws:s3:::' + config.stateBucketName, 'arn:aws:s3:::' + config.stateBucketName + '/*'],
-}));
-docsBucket.grantReadWrite(role);
-role.addToPolicy(new iam.PolicyStatement({
-  sid: 'BedrockInvoke',
-  effect: iam.Effect.ALLOW,
-  actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
-  resources: ['*'],
-}));
-logGroup.grantWrite(role);
-role.addToPolicy(new iam.PolicyStatement({
-  sid: 'EcrPull',
-  effect: iam.Effect.ALLOW,
-  actions: ['ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage', 'ecr:GetAuthorizationToken'],
-  resources: ['*'],
-}));
-cdk.Tags.of(role).add('kepler:deployment', config.deploymentName);
-cdk.Tags.of(role).add('kepler:managed', 'true');
-
-// Security Group
-const sg = new ec2.SecurityGroup(stack, 'InstanceSg', {
-  vpc: vpc,
-  description: 'Kepler instance SG for ' + config.deploymentName,
-  allowAllOutbound: true,
-});
-cdk.Tags.of(sg).add('kepler:deployment', config.deploymentName);
-cdk.Tags.of(sg).add('kepler:managed', 'true');
-
-// User Data
-const userData = ec2.UserData.forLinux();
-userData.addCommands(\`set -euo pipefail
-
-dnf update -y
-dnf install -y docker amazon-cloudwatch-agent
-
-systemctl enable --now docker
-usermod -aG docker ec2-user
-
-mkdir -p /usr/local/lib/docker/cli-plugins
-curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \\\\
-  -o /usr/local/lib/docker/cli-plugins/docker-compose
-chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-
-mkdir -p /opt/kepler
-cat > /opt/kepler/docker-compose.yml <<'COMPOSEFILE'
-services:
-  core:
-    image: ghcr.io/vleader/kepler-core:\\\${KEPLER_VERSION}
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      - PORT=8080
-      - KEPLER_DEPLOYMENT_NAME=\\\${KEPLER_DEPLOYMENT_NAME}
-      - KEPLER_STATE_BUCKET=\\\${KEPLER_STATE_BUCKET}
-      - KEPLER_REGION=\\\${AWS_REGION}
-    logging:
-      driver: awslogs
-      options:
-        awslogs-group: \\\${KEPLER_LOG_GROUP}
-        awslogs-region: \\\${AWS_REGION}
-        awslogs-stream-prefix: core
-COMPOSEFILE
-
-cat > /opt/kepler/.env <<ENVFILE
-KEPLER_VERSION=\${config.keplerVersion}
-KEPLER_DEPLOYMENT_NAME=\${config.deploymentName}
-KEPLER_STATE_BUCKET=\${config.stateBucketName}
-KEPLER_LOG_GROUP=/kepler/\${config.deploymentName}
-AWS_REGION=\${config.region}
-ENVFILE
-
-cat > /etc/systemd/system/kepler.service <<'UNITFILE'
-[Unit]
-Description=Kepler Stack
-Requires=docker.service
-After=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/opt/kepler
-EnvironmentFile=/opt/kepler/.env
-ExecStart=/usr/bin/docker compose up -d
-ExecStop=/usr/bin/docker compose down
-TimeoutStartSec=300
-
-[Install]
-WantedBy=multi-user.target
-UNITFILE
-
-systemctl daemon-reload
-systemctl enable --now kepler.service\`);
-
-// Instance
-const instance = new ec2.Instance(stack, 'KeplerInstance', {
-  instanceName: 'kepler-' + config.deploymentName,
-  vpc: vpc,
-  vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-  instanceType: new ec2.InstanceType(tierConfig.instanceType),
-  machineImage: ec2.MachineImage.latestAmazonLinux2023(),
-  role: role,
-  securityGroup: sg,
-  blockDevices: [{
-    deviceName: '/dev/xvda',
-    volume: ec2.BlockDeviceVolume.ebs(tierConfig.volumeSize, {
-      volumeType: ec2.EbsDeviceVolumeType.GP3,
-      encrypted: true,
-    }),
-  }],
-  userData: userData,
-  detailedMonitoring: false,
-  ssmSessionPermissions: true,
-});
-cdk.Tags.of(instance).add('kepler:deployment', config.deploymentName);
-cdk.Tags.of(instance).add('kepler:managed', 'true');
-
-// Outputs
-new cdk.CfnOutput(stack, 'InstanceId', { value: instance.instanceId });
-new cdk.CfnOutput(stack, 'VpcId', { value: vpc.vpcId });
-new cdk.CfnOutput(stack, 'DocsBucketName', { value: docsBucket.bucketName });
-new cdk.CfnOutput(stack, 'LogGroupName', { value: logGroup.logGroupName });
-new cdk.CfnOutput(stack, 'Region', { value: config.region });
-new cdk.CfnOutput(stack, 'DeploymentName', { value: config.deploymentName });
-`;
-
-  await writeFile(path.join(tmpDir, 'app.mjs'), appCode);
-  await writeFile(
-    path.join(tmpDir, 'cdk.json'),
-    JSON.stringify({
-      app: 'node app.mjs',
-    }),
-  );
-
-  return tmpDir;
+function prepareCdkApp(config: DeploymentConfig): string {
+  const app = createApp(config);
+  const assembly = app.synth();
+  return assembly.directory;
 }
 
 export async function deploy(
@@ -294,16 +79,17 @@ export async function deploy(
   onProgress: (msg: string) => void,
 ): Promise<DeploymentOutputs> {
   const stackName = getStackName(config.deploymentName);
-  const tmpDir = await prepareCdkApp(config);
+  const assemblyDir = prepareCdkApp(config);
+  const outputsPath = path.join(assemblyDir, 'outputs.json');
 
   try {
     // Try bootstrap first (idempotent if already done)
     onProgress('Ensuring CDK bootstrap...');
     try {
       await runCdk(
-        ['bootstrap', '--require-approval', 'never'],
+        ['bootstrap', '--require-approval', 'never', '--app', assemblyDir],
         {
-          cwd: tmpDir,
+          cwd: assemblyDir,
           env: { CDK_DEFAULT_REGION: config.region },
           onProgress,
         },
@@ -315,9 +101,9 @@ export async function deploy(
     // Deploy
     onProgress('Deploying stack...');
     await runCdk(
-      ['deploy', '--require-approval', 'never', '--outputs-file', 'outputs.json'],
+      ['deploy', '--require-approval', 'never', '--app', assemblyDir, '--outputs-file', outputsPath],
       {
-        cwd: tmpDir,
+        cwd: assemblyDir,
         env: { CDK_DEFAULT_REGION: config.region },
         onProgress,
       },
@@ -327,7 +113,7 @@ export async function deploy(
     const { readFile } = await import('node:fs/promises');
     let outputs: DeploymentOutputs;
     try {
-      const outputsRaw = await readFile(path.join(tmpDir, 'outputs.json'), 'utf8');
+      const outputsRaw = await readFile(outputsPath, 'utf8');
       const parsed = JSON.parse(outputsRaw) as Record<string, Record<string, string>>;
       const stackOutputs = parsed[stackName] || {};
 
@@ -357,8 +143,39 @@ export async function deploy(
 
     return outputs;
   } finally {
-    // Clean up temp directory
-    await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    // Clean up synth output
+    await rm(assemblyDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+export async function diff(
+  config: DeploymentConfig,
+  onProgress: (msg: string) => void,
+): Promise<string> {
+  const assemblyDir = prepareCdkApp(config);
+
+  try {
+    onProgress('Computing diff...');
+    const output = await runCdk(
+      ['diff', '--app', assemblyDir],
+      {
+        cwd: assemblyDir,
+        env: { CDK_DEFAULT_REGION: config.region },
+        onProgress,
+      },
+    );
+    return output;
+  } catch (error: unknown) {
+    // cdk diff exits with code 1 when there are differences — that's expected
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('exit 1')) {
+      // Extract the diff output from the error message
+      const match = message.match(/CDK failed \(exit 1\): ([\s\S]*)/);
+      return match?.[1]?.trim() || 'Changes detected (diff output unavailable).';
+    }
+    throw error;
+  } finally {
+    await rm(assemblyDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -376,21 +193,21 @@ export async function destroy(
     keplerVersion: '0.0.1',
   };
 
-  const tmpDir = await prepareCdkApp(dummyConfig);
+  const assemblyDir = prepareCdkApp(dummyConfig);
 
   try {
     onProgress('Destroying stack...');
     await runCdk(
-      ['destroy', '--force'],
+      ['destroy', '--force', '--app', assemblyDir],
       {
-        cwd: tmpDir,
+        cwd: assemblyDir,
         env: { CDK_DEFAULT_REGION: region },
         onProgress,
       },
     );
     onProgress('Stack destroyed successfully.');
   } finally {
-    await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    await rm(assemblyDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 

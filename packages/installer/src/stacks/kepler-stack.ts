@@ -45,6 +45,7 @@ export class KeplerStack extends cdk.Stack {
     // IAM
     const iam = new KeplerIam(this, 'Iam', {
       deploymentName: config.deploymentName,
+      region: config.region,
       stateBucketName: config.stateBucketName,
       docsBucket: storage.docsBucket,
       logGroup: storage.logGroup,

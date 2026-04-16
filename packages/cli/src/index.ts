@@ -15,7 +15,8 @@ import { sshCommand } from './commands/ssh.js';
 import { statusCommand } from './commands/status.js';
 import { tunnelCommand } from './commands/tunnel.js';
 import { versionCommand } from './commands/version.js';
-import { setJsonOutput } from './lib/logger.js';
+import { setRegionOverride } from './lib/config.js';
+import { setJsonOutput, setYesMode } from './lib/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')) as {
@@ -29,10 +30,18 @@ const program = new Command()
   )
   .version(pkg.version)
   .option('--json', 'Output in JSON format')
+  .option('--region <region>', 'Override AWS region')
+  .option('--yes', 'Skip all confirmation prompts')
   .hook('preAction', (thisCommand) => {
-    const opts = thisCommand.opts<{ json?: boolean }>();
+    const opts = thisCommand.opts<{ json?: boolean; region?: string; yes?: boolean }>();
     if (opts.json) {
       setJsonOutput(true);
+    }
+    if (opts.region) {
+      setRegionOverride(opts.region);
+    }
+    if (opts.yes) {
+      setYesMode(true);
     }
   });
 

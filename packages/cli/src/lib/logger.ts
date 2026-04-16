@@ -3,9 +3,18 @@ import { consola } from 'consola';
 export const logger = consola.withTag('kepler');
 
 let _jsonOutput = false;
+let _yesMode = false;
 
 export function isJsonOutput(): boolean {
   return _jsonOutput;
+}
+
+export function isYesMode(): boolean {
+  return _yesMode;
+}
+
+export function setYesMode(enabled: boolean): void {
+  _yesMode = enabled;
 }
 
 export function setJsonOutput(enabled: boolean): void {

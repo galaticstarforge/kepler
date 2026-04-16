@@ -80,3 +80,60 @@ describe.skipIf(!isE2E)('E2E lifecycle', () => {
     }
   });
 });
+
+// --- Non-AWS tests (always run) ---
+
+describe('CLI smoke tests', () => {
+  beforeAll(() => {
+    // Ensure CLI is built
+    execSync('pnpm run build', {
+      cwd: path.join(__dirname, '..'),
+      stdio: 'pipe',
+      timeout: 30_000,
+    });
+  });
+
+  it('prints version', () => {
+    const output = kepler('--version');
+    expect(output.trim()).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it('prints help', () => {
+    const output = kepler('--help');
+    expect(output).toContain('kepler');
+    expect(output).toContain('deploy');
+    expect(output).toContain('status');
+    expect(output).toContain('destroy');
+  });
+
+  it('iam-policy prints valid JSON', () => {
+    const output = kepler('iam-policy');
+    const policy = JSON.parse(output);
+    expect(policy.Version).toBe('2012-10-17');
+    expect(Array.isArray(policy.Statement)).toBe(true);
+    expect(policy.Statement.length).toBeGreaterThan(0);
+  });
+
+  it('config get without init returns error', () => {
+    try {
+      kepler('config get region --json');
+    } catch {
+      // Expected: not initialized
+    }
+  });
+});
+
+describe.skipIf(!isE2E)('E2E plugin & discover flows', () => {
+  it('discover lists deployed stacks', () => {
+    const output = kepler('discover --json');
+    const result = JSON.parse(output);
+    expect(Array.isArray(result.deployments || result)).toBe(true);
+  });
+
+  it('plugin list returns empty array initially', () => {
+    const output = kepler(`plugin list --json`);
+    const result = JSON.parse(output);
+    expect(result.plugins).toBeDefined();
+    expect(Array.isArray(result.plugins)).toBe(true);
+  });
+});

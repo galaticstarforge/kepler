@@ -2,10 +2,12 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { FilterLogEventsCommand } from '@aws-sdk/client-cloudwatch-logs';
 import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { SendCommandCommand } from '@aws-sdk/client-ssm';
 import { Command } from 'commander';
 
-import { getS3Client } from '../lib/aws-clients.js';
+import { getS3Client, getLogsClient, getSSMClient } from '../lib/aws-clients.js';
 import { readLocalState } from '../lib/config.js';
 import { NotInitializedError } from '../lib/errors.js';
 import { logger, handleError, output, isJsonOutput } from '../lib/logger.js';
@@ -112,8 +114,11 @@ export const pluginCommand = new Command('plugin')
           output(
             isJsonOutput()
               ? { status: 'enabled', plugin: name }
-              : `Plugin "${name}" enabled. Restart effect not implemented in v0.0.1.`,
+              : `Plugin "${name}" enabled.`,
           );
+
+          // Restart kepler service on the instance to pick up the change
+          await restartKeplerService(state, deploymentName);
         } catch (error) {
           handleError(error);
         }
@@ -165,8 +170,11 @@ export const pluginCommand = new Command('plugin')
           output(
             isJsonOutput()
               ? { status: 'disabled', plugin: name }
-              : `Plugin "${name}" disabled. Restart effect not implemented in v0.0.1.`,
+              : `Plugin "${name}" disabled.`,
           );
+
+          // Restart kepler service on the instance to pick up the change
+          await restartKeplerService(state, deploymentName);
         } catch (error) {
           handleError(error);
         }
@@ -221,8 +229,86 @@ export const pluginCommand = new Command('plugin')
     new Command('logs')
       .description('Tail plugin logs')
       .argument('<name>', 'Plugin name')
-      .action(async () => {
-        logger.info('Plugin logs not implemented in v0.0.1.');
-        process.exit(0);
+      .option('--since <duration>', 'How far back to fetch logs (e.g. 1h, 30m)', '1h')
+      .option('--limit <count>', 'Max number of log events', '100')
+      .action(async (name: string, options: { since: string; limit: string }) => {
+        try {
+          const state = readLocalState();
+          if (!state?.stateBucket) throw new NotInitializedError();
+          const deploymentName = state.lastUsedDeployment;
+          if (!deploymentName) {
+            logger.error('No active deployment.');
+            process.exit(1);
+          }
+
+          const logGroupName = `/kepler/${deploymentName}`;
+          const sinceMs = parseDuration(options.since);
+          const startTime = Date.now() - sinceMs;
+          const limit = Math.min(Number.parseInt(options.limit, 10) || 100, 10_000);
+
+          const logs = getLogsClient();
+          const response = await logs.send(
+            new FilterLogEventsCommand({
+              logGroupName,
+              filterPattern: `"${name}"`,
+              startTime,
+              limit,
+            }),
+          );
+
+          const events = response.events || [];
+
+          if (isJsonOutput()) {
+            output({ plugin: name, logGroup: logGroupName, events });
+          } else if (events.length === 0) {
+            logger.info(`No log events found for plugin "${name}" in the last ${options.since}.`);
+          } else {
+            for (const event of events) {
+              const ts = event.timestamp ? new Date(event.timestamp).toISOString() : '';
+              process.stdout.write(`${ts}  ${event.message?.trimEnd() ?? ''}\n`);
+            }
+          }
+        } catch (error) {
+          handleError(error);
+        }
       }),
   );
+
+function parseDuration(input: string): number {
+  const match = input.match(/^(\d+)(m|h|d)$/);
+  if (!match) return 3_600_000; // default 1h
+  const value = Number.parseInt(match[1]!, 10);
+  const unit = match[2];
+  if (unit === 'm') return value * 60 * 1000;
+  if (unit === 'h') return value * 60 * 60 * 1000;
+  if (unit === 'd') return value * 24 * 60 * 60 * 1000;
+  return 3_600_000;
+}
+
+async function restartKeplerService(
+  state: { stateBucket: string; region: string },
+  deploymentName: string,
+): Promise<void> {
+  const { getStatus } = await import('@kepler/installer');
+  const status = await getStatus(deploymentName, state.region);
+  if (!status?.instanceId) {
+    logger.warn('Could not determine instance ID — skipping service restart.');
+    return;
+  }
+
+  try {
+    const ssm = getSSMClient();
+    await ssm.send(
+      new SendCommandCommand({
+        InstanceIds: [status.instanceId],
+        DocumentName: 'AWS-RunShellScript',
+        Parameters: {
+          commands: ['sudo systemctl restart kepler.service'],
+        },
+      }),
+    );
+    logger.info('Restarting kepler service on instance...');
+  } catch {
+    logger.warn('Failed to restart kepler service. You may need to restart it manually.');
+  }
+}
