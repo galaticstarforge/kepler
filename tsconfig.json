@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/plugin-sdk" },
+    { "path": "packages/core" },
+    { "path": "packages/installer" },
+    { "path": "packages/cli" }
+  ]
+}
