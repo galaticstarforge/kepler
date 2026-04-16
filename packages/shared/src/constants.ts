@@ -1,0 +1,10 @@
+export const DEFAULT_REGION = 'us-east-1';
+export const STATE_BUCKET_PREFIX = 'kepler-state-';
+export const DOCS_BUCKET_PREFIX = 'kepler-docs-';
+export const STACK_PREFIX = 'kepler-';
+export const TAG_DEPLOYMENT = 'kepler:deployment';
+export const TAG_MANAGED = 'kepler:managed';
+export const TAG_VERSION = 'kepler:version';
+export const DEFAULT_PORT = 8080;
+export const LOG_GROUP_PREFIX = '/kepler/';
+export const KEPLER_VERSION = '0.0.1';

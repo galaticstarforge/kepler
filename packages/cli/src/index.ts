@@ -14,6 +14,7 @@ import { pluginCommand } from './commands/plugin.js';
 import { sshCommand } from './commands/ssh.js';
 import { statusCommand } from './commands/status.js';
 import { tunnelCommand } from './commands/tunnel.js';
+import { versionCommand } from './commands/version.js';
 import { setJsonOutput } from './lib/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -45,5 +46,6 @@ program.addCommand(sshCommand);
 program.addCommand(pluginCommand);
 program.addCommand(iamPolicyCommand);
 program.addCommand(configCommand);
+program.addCommand(versionCommand);
 
 program.parse();
