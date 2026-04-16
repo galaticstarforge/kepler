@@ -1,8 +1,11 @@
 import * as cdk from 'aws-cdk-lib';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 import type { DeploymentConfig } from '../types.js';
 
+import { KeplerBedrock } from './constructs/kepler-bedrock.js';
+import { KeplerDocEvents } from './constructs/kepler-doc-events.js';
 import { KeplerIam } from './constructs/kepler-iam.js';
 import { KeplerInstance } from './constructs/kepler-instance.js';
 import { KeplerStorage } from './constructs/kepler-storage.js';
@@ -43,7 +46,7 @@ export class KeplerStack extends cdk.Stack {
     });
 
     // IAM
-    const iam = new KeplerIam(this, 'Iam', {
+    const iamConstruct = new KeplerIam(this, 'Iam', {
       deploymentName: config.deploymentName,
       region: config.region,
       stateBucketName: config.stateBucketName,
@@ -51,11 +54,47 @@ export class KeplerStack extends cdk.Stack {
       logGroup: storage.logGroup,
     });
 
+    // Document change events (EventBridge + SQS)
+    const docEvents = new KeplerDocEvents(this, 'DocEvents', {
+      deploymentName: config.deploymentName,
+      docsBucket: storage.docsBucket,
+    });
+
+    // Grant instance role permissions to consume the event queue.
+    docEvents.eventQueue.grantConsumeMessages(iamConstruct.instanceRole as iam.Role);
+
+    // Optional: Bedrock Knowledge Base
+    let bedrockConstruct: KeplerBedrock | undefined;
+    if (config.enableBedrockKB) {
+      bedrockConstruct = new KeplerBedrock(this, 'Bedrock', {
+        deploymentName: config.deploymentName,
+        docsBucket: storage.docsBucket,
+        docsPrefix: config.docsPrefix ?? 'docs/',
+        region: config.region,
+        embeddingModelId: config.bedrockEmbeddingModelId,
+      });
+
+      // Grant instance role Bedrock KB permissions.
+      (iamConstruct.instanceRole as iam.Role).addToPolicy(
+        new iam.PolicyStatement({
+          sid: 'BedrockKbAccess',
+          effect: iam.Effect.ALLOW,
+          actions: [
+            'bedrock:Retrieve',
+            'bedrock:StartIngestionJob',
+            'bedrock:GetKnowledgeBase',
+            'bedrock:GetDataSource',
+          ],
+          resources: ['*'],
+        }),
+      );
+    }
+
     // EC2 Instance
     const instance = new KeplerInstance(this, 'Instance', {
       deploymentName: config.deploymentName,
       vpc: vpcConstruct.vpc,
-      instanceRole: iam.instanceRole,
+      instanceRole: iamConstruct.instanceRole,
       instanceType: tierConfig.instanceType,
       volumeSize: tierConfig.volumeSize,
       keplerVersion: config.keplerVersion,
@@ -71,5 +110,11 @@ export class KeplerStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'LogGroupName', { value: storage.logGroup.logGroupName });
     new cdk.CfnOutput(this, 'Region', { value: config.region });
     new cdk.CfnOutput(this, 'DeploymentName', { value: config.deploymentName });
+    new cdk.CfnOutput(this, 'DocEventQueueUrl', { value: docEvents.eventQueue.queueUrl });
+
+    if (bedrockConstruct) {
+      new cdk.CfnOutput(this, 'KnowledgeBaseId', { value: bedrockConstruct.knowledgeBaseId });
+      new cdk.CfnOutput(this, 'DataSourceId', { value: bedrockConstruct.dataSourceId });
+    }
   }
 }

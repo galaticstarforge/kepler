@@ -6,6 +6,9 @@ export interface DeploymentConfig {
   vpcStrategy: 'create' | 'existing' | 'default';
   existingVpcId?: string;
   keplerVersion: string;
+  enableBedrockKB?: boolean;
+  bedrockEmbeddingModelId?: string;
+  docsPrefix?: string;
 }
 
 export interface DeploymentOutputs {
@@ -17,6 +20,9 @@ export interface DeploymentOutputs {
   region: string;
   deploymentName: string;
   status: 'CREATE_COMPLETE' | 'UPDATE_COMPLETE' | 'CREATE_IN_PROGRESS' | string;
+  knowledgeBaseId?: string;
+  dataSourceId?: string;
+  docEventQueueUrl?: string;
 }
 
 export interface StateBucketEntry {
