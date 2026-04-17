@@ -5,7 +5,7 @@ RUN npm install --omit=dev
 COPY dist/ ./dist/
 
 FROM node:20-alpine
-RUN addgroup -g 1000 kepler && adduser -u 1000 -G kepler -D kepler
+RUN addgroup kepler && adduser -G kepler -D kepler
 WORKDIR /app
 COPY --from=builder --chown=kepler:kepler /app /app
 USER kepler
