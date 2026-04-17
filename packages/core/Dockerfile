@@ -1,11 +1,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package.json ./
-RUN npm install --omit=dev
+RUN sed -i '/@kepler\/shared/d' package.json && npm install --omit=dev
 COPY dist/ ./dist/
 
 FROM node:20-alpine
-RUN addgroup -g 1000 kepler && adduser -u 1000 -G kepler -D kepler
+RUN addgroup kepler && adduser -G kepler -D kepler
 WORKDIR /app
 COPY --from=builder --chown=kepler:kepler /app /app
 USER kepler

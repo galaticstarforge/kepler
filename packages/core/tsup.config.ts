@@ -7,4 +7,5 @@ export default defineConfig({
   clean: true,
   splitting: false,
   removeComments: true,
+  noExternal: ['@kepler/shared'],
 });

@@ -104,4 +104,63 @@ describe('createApp', () => {
 
     expect(template).toContain('m7i.2xlarge');
   });
+
+  it('creates doc events SQS queue and EventBridge rule', () => {
+    const app = createApp(TEST_CONFIG);
+    const assembly = app.synth();
+    const template = assembly.stacks[0]!.template as Record<string, Record<string, Record<string, unknown>>>;
+    const resources = template['Resources'] || {};
+
+    const sqsQueue = Object.values(resources).find(
+      (r) => r['Type'] === 'AWS::SQS::Queue' && JSON.stringify(r).includes('kepler-doc-events-test-deploy'),
+    );
+    expect(sqsQueue).toBeDefined();
+
+    const rule = Object.values(resources).find(
+      (r) => r['Type'] === 'AWS::Events::Rule',
+    );
+    expect(rule).toBeDefined();
+  });
+
+  it('produces DocEventQueueUrl output', () => {
+    const app = createApp(TEST_CONFIG);
+    const assembly = app.synth();
+    const template = assembly.stacks[0]!.template as Record<string, Record<string, unknown>>;
+    const outputs = template['Outputs'] || {};
+    expect(Object.keys(outputs)).toContain('DocEventQueueUrl');
+  });
+
+  it('does not create Bedrock KB when enableBedrockKB is false', () => {
+    const app = createApp(TEST_CONFIG);
+    const assembly = app.synth();
+    const template = assembly.stacks[0]!.template as Record<string, Record<string, Record<string, unknown>>>;
+    const resources = template['Resources'] || {};
+
+    const kbResource = Object.values(resources).find(
+      (r) => r['Type'] === 'AWS::Bedrock::KnowledgeBase',
+    );
+    expect(kbResource).toBeUndefined();
+  });
+
+  it('creates Bedrock KB when enableBedrockKB is true', () => {
+    const bedrockConfig = { ...TEST_CONFIG, enableBedrockKB: true };
+    const app = createApp(bedrockConfig);
+    const assembly = app.synth();
+    const template = assembly.stacks[0]!.template as Record<string, Record<string, Record<string, unknown>>>;
+    const resources = template['Resources'] || {};
+    const outputs = template['Outputs'] || {};
+
+    const kbResource = Object.values(resources).find(
+      (r) => r['Type'] === 'AWS::Bedrock::KnowledgeBase',
+    );
+    expect(kbResource).toBeDefined();
+
+    const dsResource = Object.values(resources).find(
+      (r) => r['Type'] === 'AWS::Bedrock::DataSource',
+    );
+    expect(dsResource).toBeDefined();
+
+    expect(Object.keys(outputs)).toContain('KnowledgeBaseId');
+    expect(Object.keys(outputs)).toContain('DataSourceId');
+  });
 });

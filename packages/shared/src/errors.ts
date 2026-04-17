@@ -72,3 +72,35 @@ export class NotInitializedError extends KeplerError {
     this.name = 'NotInitializedError';
   }
 }
+
+export class DocumentNotFoundError extends KeplerError {
+  constructor(path: string) {
+    super(`Document not found: "${path}".`, {
+      hint: 'Check the path and try again, or use `docs.list` to see available documents.',
+    });
+    this.name = 'DocumentNotFoundError';
+  }
+}
+
+export class DocumentStoreError extends KeplerError {
+  constructor(message: string, cause?: unknown) {
+    super(message, { cause });
+    this.name = 'DocumentStoreError';
+  }
+}
+
+export class SemanticIndexError extends KeplerError {
+  constructor(message: string, cause?: unknown) {
+    super(message, { cause });
+    this.name = 'SemanticIndexError';
+  }
+}
+
+export class FrontmatterValidationError extends KeplerError {
+  constructor(path: string, issues: string[]) {
+    super(`Frontmatter validation failed for "${path}": ${issues.join('; ')}`, {
+      hint: 'Frontmatter errors are non-fatal — the document will still be stored with reduced metadata.',
+    });
+    this.name = 'FrontmatterValidationError';
+  }
+}
