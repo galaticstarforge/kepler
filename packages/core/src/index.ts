@@ -8,6 +8,8 @@ import { ConceptExtractor } from './enrichment/concept-extractor.js';
 import { ConceptStore } from './enrichment/concept-store.js';
 import { EnrichmentRunner } from './enrichment/enrichment-runner.js';
 import { createLlmClient } from './enrichment/llm/llm-factory.js';
+import { createGraphClient } from './graph/graph-client-factory.js';
+import { CORE_INDEX_STATEMENTS } from './graph/schema.js';
 import { createLogger, setLogLevel } from './logger.js';
 import { McpRouter } from './mcp/mcp-router.js';
 import { GitRepoWatcher } from './repos/git-repo-watcher.js';
@@ -42,6 +44,19 @@ const PORT = config.mcp.port;
 // Initialize storage subsystems.
 const store = createDocumentStore(config.storage.documents);
 const index = createSemanticIndex(config.storage.semanticIndex);
+
+// Neo4j graph client — connect and apply canonical indexes before accepting traffic.
+const graph = createGraphClient(config.storage.graph);
+try {
+  await graph.connect();
+  log.info('neo4j connected', { bolt: config.storage.graph.bolt });
+  await graph.applySchema(CORE_INDEX_STATEMENTS);
+  log.info('neo4j schema applied', { statements: CORE_INDEX_STATEMENTS.length });
+} catch (error) {
+  log.error('neo4j startup failed', { bolt: config.storage.graph.bolt, error: String(error) });
+  process.exit(1);
+}
+
 const templates = new TemplateManager(store);
 
 // Install default templates on startup.
@@ -88,6 +103,7 @@ if (config.sourceAccess.enabled) {
 const router = new McpRouter({
   store,
   index,
+  graph,
   templates,
   conceptStore,
   enrichmentRunner,
@@ -107,7 +123,7 @@ function shutdown(signal: string): void {
   log.info('shutdown', { signal });
   repoWatcher?.stop();
   server.close(() => {
-    process.exit(0);
+    graph.close().finally(() => process.exit(0));
   });
   setTimeout(() => {
     log.warn('forced shutdown after timeout');
@@ -126,6 +142,7 @@ server.listen(PORT, () => {
     region: REGION,
     documentProvider: config.storage.documents.provider,
     semanticProvider: config.storage.semanticIndex.provider,
+    graphBolt: config.storage.graph.bolt,
     tools: router.listTools(),
   });
 });
@@ -133,6 +150,8 @@ server.listen(PORT, () => {
 // Re-export public API for programmatic use.
 export { createDocumentStore } from './storage/document-store-factory.js';
 export { createSemanticIndex } from './semantic/semantic-index-factory.js';
+export { GraphClient, createGraphClient, CORE_INDEX_STATEMENTS } from './graph/index.js';
+export type { GraphClientOptions, AccessMode } from './graph/index.js';
 export { McpRouter } from './mcp/mcp-router.js';
 export { TemplateManager } from './docs/template-manager.js';
 export { parseFrontmatter } from './docs/frontmatter-parser.js';

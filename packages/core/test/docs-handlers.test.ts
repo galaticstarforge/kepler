@@ -9,6 +9,7 @@ import { ConceptExtractor } from '../src/enrichment/concept-extractor.js';
 import { ConceptStore } from '../src/enrichment/concept-store.js';
 import { EnrichmentRunner } from '../src/enrichment/enrichment-runner.js';
 import { NoopLlmClient } from '../src/enrichment/llm/noop-llm-client.js';
+import type { GraphClient } from '../src/graph/graph-client.js';
 import { McpRouter } from '../src/mcp/mcp-router.js';
 import type { HandlerContext } from '../src/mcp/types.js';
 import { NoopSemanticIndex } from '../src/semantic/noop-semantic-index.js';
@@ -43,6 +44,7 @@ beforeEach(async () => {
   const ctx: HandlerContext = {
     store,
     index,
+    graph: {} as unknown as GraphClient,
     templates,
     conceptStore,
     enrichmentRunner,

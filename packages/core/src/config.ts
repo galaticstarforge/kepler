@@ -18,6 +18,14 @@ export interface SemanticIndexConfig {
   region?: string;
 }
 
+export interface GraphConfig {
+  bolt: string;
+  username?: string;
+  password?: string;
+  database?: string;
+  maxPoolSize?: number;
+}
+
 export interface ConceptExtractionConfig {
   enabled: boolean;
   provider: 'bedrock' | 'none';
@@ -47,6 +55,7 @@ export interface CoreConfig {
   storage: {
     documents: DocumentsConfig;
     semanticIndex: SemanticIndexConfig;
+    graph: GraphConfig;
   };
   mcp: {
     port: number;
@@ -63,6 +72,7 @@ const DEFAULT_CONFIG: CoreConfig = {
   storage: {
     documents: { provider: 'filesystem', rootDir: './docs-store' },
     semanticIndex: { provider: 'none' },
+    graph: { bolt: 'bolt://localhost:7687' },
   },
   mcp: { port: 8080 },
   observability: { logLevel: 'info' },
@@ -115,6 +125,10 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
       semanticIndex: {
         ...defaults.storage.semanticIndex,
         ...(storage?.['semanticIndex'] as Partial<SemanticIndexConfig> | undefined),
+      },
+      graph: {
+        ...defaults.storage.graph,
+        ...(storage?.['graph'] as Partial<GraphConfig> | undefined),
       },
     },
     mcp: { ...defaults.mcp, ...mcp },
