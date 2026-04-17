@@ -13,7 +13,13 @@ import type {
   EmbeddingResponse,
   LlmClient,
 } from '../src/enrichment/llm/llm-client.js';
+import type { GraphClient } from '../src/graph/graph-client.js';
 import { FilesystemDocumentStore } from '../src/storage/filesystem-document-store.js';
+
+const stubGraph = {
+  runWrite: async () => [],
+  runRead: async () => [],
+} as unknown as GraphClient;
 
 const CONFIG: ConceptExtractionConfig = {
   enabled: true,
@@ -95,6 +101,7 @@ describe('EnrichmentRunner', () => {
       conceptStore,
       extractor: new ConceptExtractor(llm),
       llm,
+      graph: stubGraph,
       config: { ...CONFIG, enabled: false, provider: 'none' },
     });
 
@@ -108,6 +115,7 @@ describe('EnrichmentRunner', () => {
       conceptStore,
       extractor: new ConceptExtractor(llm),
       llm,
+      graph: stubGraph,
       config: CONFIG,
     });
 
@@ -138,6 +146,7 @@ describe('EnrichmentRunner', () => {
       conceptStore,
       extractor: new ConceptExtractor(llm),
       llm,
+      graph: stubGraph,
       config: CONFIG,
     });
 
@@ -167,6 +176,7 @@ describe('EnrichmentRunner', () => {
       conceptStore,
       extractor: new ConceptExtractor(llm),
       llm,
+      graph: stubGraph,
       config: { ...CONFIG, minDocChars: 10_000 },
     });
 
@@ -192,6 +202,7 @@ describe('EnrichmentRunner', () => {
       conceptStore,
       extractor: new ConceptExtractor(llm),
       llm,
+      graph: stubGraph,
       config: CONFIG,
     });
 

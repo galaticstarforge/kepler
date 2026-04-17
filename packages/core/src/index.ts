@@ -77,6 +77,7 @@ const enrichmentRunner = new EnrichmentRunner({
   extractor: conceptExtractor,
   llm,
   config: config.enrichment.conceptExtraction,
+  graph,
 });
 
 // Git repo watcher (optional; activates when repos.yaml present and sourceAccess.enabled).

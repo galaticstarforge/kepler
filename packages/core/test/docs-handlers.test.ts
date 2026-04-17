@@ -26,11 +26,17 @@ beforeEach(async () => {
   const conceptStore = new ConceptStore(store);
   const llm = new NoopLlmClient();
   const extractor = new ConceptExtractor(llm);
+  const stubGraph = {
+    runWrite: async () => [],
+    runRead: async () => [],
+  } as unknown as GraphClient;
+
   const enrichmentRunner = new EnrichmentRunner({
     store,
     conceptStore,
     extractor,
     llm,
+    graph: stubGraph,
     config: {
       enabled: false,
       provider: 'none',
@@ -44,7 +50,7 @@ beforeEach(async () => {
   const ctx: HandlerContext = {
     store,
     index,
-    graph: {} as unknown as GraphClient,
+    graph: stubGraph,
     templates,
     conceptStore,
     enrichmentRunner,

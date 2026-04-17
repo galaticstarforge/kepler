@@ -11,6 +11,7 @@ import type {
 import { CONCEPTS_PREFIX, EnrichmentError } from '@kepler/shared';
 
 import type { ConceptExtractionConfig } from '../config.js';
+import type { GraphClient } from '../graph/graph-client.js';
 import { createLogger } from '../logger.js';
 
 import type { ConceptExtractor } from './concept-extractor.js';
@@ -26,6 +27,7 @@ export interface EnrichmentRunnerDeps {
   extractor: ConceptExtractor;
   llm: LlmClient;
   config: ConceptExtractionConfig;
+  graph: GraphClient;
 }
 
 export interface EnrichmentRunOptions {
@@ -145,6 +147,42 @@ export class EnrichmentRunner {
 
       stats.conceptsCreated = created.size;
       stats.conceptsUpdated = [...dirty].filter((s) => !created.has(s)).length;
+
+      // Persist concepts and their mentions to the graph.
+      const toSync = new Set([...created, ...[...dirty].filter((s) => !created.has(s))]);
+      for (const slug of toSync) {
+        const c = bySlug.get(slug);
+        if (!c) continue;
+        try {
+          await this.deps.graph.runWrite(
+            `MERGE (c:Concept {id: $id})
+             SET c.name        = $name,
+                 c.description = $description,
+                 c.createdAt   = $createdAt,
+                 c.updatedAt   = $updatedAt
+             WITH c
+             UNWIND $mentions AS m
+             MERGE (d:Document {path: m.docPath})
+             MERGE (c)-[r:MENTIONED_IN]->(d)
+             SET r.confidence  = m.confidence,
+                 r.extractedAt = m.extractedAt`,
+            {
+              id:          c.id,
+              name:        c.name,
+              description: c.description ?? null,
+              createdAt:   c.createdAt,
+              updatedAt:   c.updatedAt,
+              mentions:    c.mentions.map((m) => ({
+                docPath:     m.docPath,
+                confidence:  m.confidence,
+                extractedAt: m.extractedAt,
+              })),
+            },
+          );
+        } catch (graphError) {
+          stats.errors.push(`graph sync ${c.id}: ${String(graphError)}`);
+        }
+      }
 
       record.status = 'completed';
     } catch (error) {
