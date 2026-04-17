@@ -5,6 +5,7 @@ import type { GraphClient } from '../graph/graph-client.js';
 import { createLogger, type Logger } from '../logger.js';
 import type { GitRepoWatcher, RepoUpdateEvent } from '../repos/git-repo-watcher.js';
 
+import { BehavioralAnalyzer } from './extractor/behavioral-analyzer.js';
 import { GraphWriter } from './extractor/graph-writer.js';
 import { JsExtractor } from './extractor/js-extractor.js';
 import { FileDiscovery } from './file-discovery.js';
@@ -92,6 +93,7 @@ export class Orchestrator {
     if (files.length === 0) return;
 
     const extractor = new JsExtractor({ repo: repo.name });
+    const behavioralAnalyzer = new BehavioralAnalyzer({ repo: repo.name });
     const writer = new GraphWriter({
       graph: this.deps.graph,
       logger: createLogger('graph-writer'),
@@ -107,6 +109,10 @@ export class Orchestrator {
         // Stamp the hash from discovery (extractor leaves it blank)
         result.module.hash = file.hash;
         await writer.write(result);
+
+        const behavioral = behavioralAnalyzer.analyze(file.relativePath, content, result.symbols);
+        await writer.writeBehavioral(repo.name, file.relativePath, behavioral);
+
         indexed++;
       } catch (error) {
         errors++;
