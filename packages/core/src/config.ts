@@ -18,6 +18,20 @@ export interface SemanticIndexConfig {
   region?: string;
 }
 
+export interface ConceptExtractionConfig {
+  enabled: boolean;
+  provider: 'bedrock' | 'none';
+  model: string;
+  embeddingModel: string;
+  similarityThreshold: number;
+  minDocChars: number;
+  region?: string;
+}
+
+export interface EnrichmentConfig {
+  conceptExtraction: ConceptExtractionConfig;
+}
+
 export interface CoreConfig {
   system: {
     name: string;
@@ -33,6 +47,7 @@ export interface CoreConfig {
   observability: {
     logLevel: 'debug' | 'info' | 'warn' | 'error';
   };
+  enrichment: EnrichmentConfig;
 }
 
 const DEFAULT_CONFIG: CoreConfig = {
@@ -43,6 +58,16 @@ const DEFAULT_CONFIG: CoreConfig = {
   },
   mcp: { port: 8080 },
   observability: { logLevel: 'info' },
+  enrichment: {
+    conceptExtraction: {
+      enabled: false,
+      provider: 'none',
+      model: 'anthropic.claude-3-5-haiku-20241022-v1:0',
+      embeddingModel: 'amazon.titan-embed-text-v2:0',
+      similarityThreshold: 0.88,
+      minDocChars: 400,
+    },
+  },
 };
 
 export function loadConfig(path?: string): CoreConfig {
@@ -64,6 +89,7 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
   const storage = raw['storage'] as Record<string, unknown> | undefined;
   const mcp = raw['mcp'] as Partial<CoreConfig['mcp']> | undefined;
   const observability = raw['observability'] as Partial<CoreConfig['observability']> | undefined;
+  const enrichment = raw['enrichment'] as Record<string, unknown> | undefined;
 
   return {
     system: { ...defaults.system, ...system },
@@ -79,5 +105,11 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
     },
     mcp: { ...defaults.mcp, ...mcp },
     observability: { ...defaults.observability, ...observability },
+    enrichment: {
+      conceptExtraction: {
+        ...defaults.enrichment.conceptExtraction,
+        ...(enrichment?.['conceptExtraction'] as Partial<ConceptExtractionConfig> | undefined),
+      },
+    },
   };
 }

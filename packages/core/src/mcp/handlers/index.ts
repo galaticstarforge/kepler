@@ -1,5 +1,9 @@
 import type { ToolHandler } from '../types.js';
 
+import { adminEnrichmentRun } from './admin-enrichment-run.js';
+import { adminEnrichmentStatus } from './admin-enrichment-status.js';
+import { conceptsList } from './concepts-list.js';
+import { conceptsRead } from './concepts-read.js';
 import { docsApplyTemplate } from './docs-apply-template.js';
 import { docsCreate } from './docs-create.js';
 import { docsDelete } from './docs-delete.js';
@@ -20,4 +24,8 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   'docs.propose': docsPropose,
   'docs.listTemplates': docsListTemplates,
   'docs.applyTemplate': docsApplyTemplate,
+  'concepts.list': conceptsList,
+  'concepts.read': conceptsRead,
+  'admin.enrichmentRun': adminEnrichmentRun,
+  'admin.enrichmentStatus': adminEnrichmentStatus,
 };

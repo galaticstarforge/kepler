@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 import { loadConfig } from './config.js';
 import { TemplateManager } from './docs/template-manager.js';
+import { ConceptExtractor } from './enrichment/concept-extractor.js';
+import { ConceptStore } from './enrichment/concept-store.js';
+import { EnrichmentRunner } from './enrichment/enrichment-runner.js';
+import { createLlmClient } from './enrichment/llm/llm-factory.js';
 import { createLogger, setLogLevel } from './logger.js';
 import { McpRouter } from './mcp/mcp-router.js';
 import { createSemanticIndex } from './semantic/semantic-index-factory.js';
@@ -43,11 +47,28 @@ templates.ensureDefaultTemplates().catch((error) => {
   log.warn('failed to install default templates', { error: String(error) });
 });
 
+// Enrichment pipeline.
+const conceptStore = new ConceptStore(store);
+const llm = createLlmClient(
+  config.enrichment.conceptExtraction,
+  config.storage.semanticIndex.region ?? REGION,
+);
+const conceptExtractor = new ConceptExtractor(llm);
+const enrichmentRunner = new EnrichmentRunner({
+  store,
+  conceptStore,
+  extractor: conceptExtractor,
+  llm,
+  config: config.enrichment.conceptExtraction,
+});
+
 // Create MCP router with handler context.
 const router = new McpRouter({
   store,
   index,
   templates,
+  conceptStore,
+  enrichmentRunner,
   logger: createLogger('mcp'),
 });
 
@@ -95,3 +116,15 @@ export { parseFrontmatter } from './docs/frontmatter-parser.js';
 export { stripMarkdown } from './docs/markdown-stripper.js';
 export { createLogger, setLogLevel } from './logger.js';
 export { loadConfig } from './config.js';
+export {
+  ConceptExtractor,
+  ConceptStore,
+  EnrichmentRunner,
+  BedrockLlmClient,
+  NoopLlmClient,
+  createLlmClient,
+  slugify,
+  cosine,
+  encodeEmbedding,
+  decodeEmbedding,
+} from './enrichment/index.js';

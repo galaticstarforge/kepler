@@ -1,12 +1,16 @@
 import type { DocumentStore, SemanticIndex } from '@kepler/shared';
 
 import type { TemplateManager } from '../docs/template-manager.js';
+import type { ConceptStore } from '../enrichment/concept-store.js';
+import type { EnrichmentRunner } from '../enrichment/enrichment-runner.js';
 import type { Logger } from '../logger.js';
 
 export interface HandlerContext {
   store: DocumentStore;
   index: SemanticIndex;
   templates: TemplateManager;
+  conceptStore: ConceptStore;
+  enrichmentRunner: EnrichmentRunner;
   logger: Logger;
 }
 

@@ -96,6 +96,13 @@ export class SemanticIndexError extends KeplerError {
   }
 }
 
+export class EnrichmentError extends KeplerError {
+  constructor(message: string, cause?: unknown) {
+    super(message, { cause });
+    this.name = 'EnrichmentError';
+  }
+}
+
 export class FrontmatterValidationError extends KeplerError {
   constructor(path: string, issues: string[]) {
     super(`Frontmatter validation failed for "${path}": ${issues.join('; ')}`, {

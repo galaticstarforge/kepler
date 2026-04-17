@@ -8,7 +8,7 @@ import type {
   SearchResult,
   SemanticIndex,
 } from '@kepler/shared';
-import { SemanticIndexError } from '@kepler/shared';
+import { CONCEPTS_PREFIX, SemanticIndexError } from '@kepler/shared';
 
 import { getBedrockAgentClient, getBedrockAgentRuntimeClient } from '../aws-clients.js';
 import { createLogger } from '../logger.js';
@@ -37,8 +37,15 @@ export class BedrockSemanticIndex implements SemanticIndex {
    * document content is written to S3 by the DocumentStore — this just
    * tells Bedrock KB to pick up changes.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async upsert(doc: IndexableDocument): Promise<void> {
+    // Concepts live under CONCEPTS_PREFIX in the DocumentStore but are not
+    // documents — never ingest them into the KB. The AWS-side inclusion
+    // prefix on the data source is the primary gate; this is defense in depth.
+    if (doc.path.startsWith(CONCEPTS_PREFIX)) {
+      log.debug('skipping concept path', { path: doc.path });
+      return;
+    }
+
     if (!this.config.dataSourceId) {
       log.debug('no dataSourceId configured — skipping ingestion trigger');
       return;
