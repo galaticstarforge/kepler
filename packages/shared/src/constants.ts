@@ -16,6 +16,8 @@ export const CLAUDE_PREFIX = '.claude/';
 export const PROPOSALS_PREFIX = '.claude/proposals/';
 export const SCRATCHPAD_PREFIX = '.claude/scratchpad/';
 export const SESSIONS_PREFIX = '.claude/sessions/';
+export const CONCEPTS_PREFIX = 'concepts/';
+export const CONCEPT_RUNS_PREFIX = 'concepts/_runs/';
 
 // Document types and statuses (must match the type unions in frontmatter.ts)
 export const DOCUMENT_TYPES = [

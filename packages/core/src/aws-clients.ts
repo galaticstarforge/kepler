@@ -1,5 +1,6 @@
 import { BedrockAgentClient } from '@aws-sdk/client-bedrock-agent';
 import { BedrockAgentRuntimeClient } from '@aws-sdk/client-bedrock-agent-runtime';
+import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { S3Client } from '@aws-sdk/client-s3';
 import { SQSClient } from '@aws-sdk/client-sqs';
 
@@ -7,6 +8,7 @@ let _s3: S3Client | undefined;
 let _sqs: SQSClient | undefined;
 let _bedrockAgent: BedrockAgentClient | undefined;
 let _bedrockAgentRuntime: BedrockAgentRuntimeClient | undefined;
+let _bedrockRuntime: BedrockRuntimeClient | undefined;
 
 export function getS3Client(region: string): S3Client {
   if (!_s3) _s3 = new S3Client({ region });
@@ -28,10 +30,16 @@ export function getBedrockAgentRuntimeClient(region: string): BedrockAgentRuntim
   return _bedrockAgentRuntime;
 }
 
+export function getBedrockRuntimeClient(region: string): BedrockRuntimeClient {
+  if (!_bedrockRuntime) _bedrockRuntime = new BedrockRuntimeClient({ region });
+  return _bedrockRuntime;
+}
+
 /** Reset cached clients (useful in tests). */
 export function resetClients(): void {
   _s3 = undefined;
   _sqs = undefined;
   _bedrockAgent = undefined;
   _bedrockAgentRuntime = undefined;
+  _bedrockRuntime = undefined;
 }

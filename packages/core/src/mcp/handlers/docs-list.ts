@@ -1,4 +1,5 @@
 import type { DocumentHead } from '@kepler/shared';
+import { CONCEPTS_PREFIX } from '@kepler/shared';
 
 import type { HandlerContext, McpToolResponse } from '../types.js';
 import { structuredResponse } from '../types.js';
@@ -11,6 +12,10 @@ export async function docsList(
 
   const items: DocumentHead[] = [];
   for await (const head of ctx.store.list(prefix)) {
+    // Concepts live under the same DocumentStore but are a separate artifact
+    // kind — filter them from document listings. Callers asking explicitly
+    // for the concepts prefix still see them.
+    if (!prefix.startsWith(CONCEPTS_PREFIX) && head.path.startsWith(CONCEPTS_PREFIX)) continue;
     items.push(head);
   }
 

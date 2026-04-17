@@ -5,6 +5,10 @@ import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { TemplateManager } from '../src/docs/template-manager.js';
+import { ConceptExtractor } from '../src/enrichment/concept-extractor.js';
+import { ConceptStore } from '../src/enrichment/concept-store.js';
+import { EnrichmentRunner } from '../src/enrichment/enrichment-runner.js';
+import { NoopLlmClient } from '../src/enrichment/llm/noop-llm-client.js';
 import { McpRouter } from '../src/mcp/mcp-router.js';
 import type { HandlerContext } from '../src/mcp/types.js';
 import { NoopSemanticIndex } from '../src/semantic/noop-semantic-index.js';
@@ -18,11 +22,30 @@ beforeEach(async () => {
   const store = new FilesystemDocumentStore(tmpDir);
   const index = new NoopSemanticIndex();
   const templates = new TemplateManager(store);
+  const conceptStore = new ConceptStore(store);
+  const llm = new NoopLlmClient();
+  const extractor = new ConceptExtractor(llm);
+  const enrichmentRunner = new EnrichmentRunner({
+    store,
+    conceptStore,
+    extractor,
+    llm,
+    config: {
+      enabled: false,
+      provider: 'none',
+      model: 'stub',
+      embeddingModel: 'stub',
+      similarityThreshold: 0.88,
+      minDocChars: 400,
+    },
+  });
 
   const ctx: HandlerContext = {
     store,
     index,
     templates,
+    conceptStore,
+    enrichmentRunner,
     logger: {
       debug: () => {},
       info: () => {},
