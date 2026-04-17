@@ -5,9 +5,9 @@ import type { GraphClient } from '../graph/graph-client.js';
 import { createLogger, type Logger } from '../logger.js';
 import type { GitRepoWatcher, RepoUpdateEvent } from '../repos/git-repo-watcher.js';
 
-import { FileDiscovery } from './file-discovery.js';
 import { GraphWriter } from './extractor/graph-writer.js';
 import { JsExtractor } from './extractor/js-extractor.js';
+import { FileDiscovery } from './file-discovery.js';
 
 export interface OrchestratorDeps {
   watcher: GitRepoWatcher;

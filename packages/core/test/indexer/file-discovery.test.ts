@@ -97,7 +97,6 @@ describe('FileDiscovery', () => {
     // Discovery will compute a real hash; we need to match it
     const discoveryForHash = new FileDiscovery({ graph: stubGraph([]) });
     const allFiles = await discoveryForHash.discoverChangedFiles('repo', tmpDir, DEFAULT_CONFIG);
-    const knownHash = allFiles[0]?.hash ?? '';
     const knownPath = allFiles[0]?.relativePath ?? '';
 
     // Now stub graph to return that path (meaning: hash matches, skip it)

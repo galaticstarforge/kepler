@@ -108,9 +108,9 @@ export class FileDiscovery {
           (r) => ({ path: r.get('path') as string }),
         );
         for (const row of rows) unchangedPaths.add(row.path);
-      } catch (err) {
+      } catch (error) {
         // If the hash check fails, proceed with all files — safe to re-index
-        this.log.warn('hash batch check failed, indexing all files', { repo, error: String(err) });
+        this.log.warn('hash batch check failed, indexing all files', { repo, error: String(error) });
         return files;
       }
     }

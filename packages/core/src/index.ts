@@ -4,13 +4,13 @@ import { fileURLToPath } from 'node:url';
 
 import { loadConfig } from './config.js';
 import { TemplateManager } from './docs/template-manager.js';
-import { Orchestrator } from './indexer/index.js';
 import { ConceptExtractor } from './enrichment/concept-extractor.js';
 import { ConceptStore } from './enrichment/concept-store.js';
 import { EnrichmentRunner } from './enrichment/enrichment-runner.js';
 import { createLlmClient } from './enrichment/llm/llm-factory.js';
 import { createGraphClient } from './graph/graph-client-factory.js';
 import { CORE_INDEX_STATEMENTS } from './graph/schema.js';
+import { Orchestrator } from './indexer/index.js';
 import { createLogger, setLogLevel } from './logger.js';
 import { McpRouter } from './mcp/mcp-router.js';
 import { GitRepoWatcher } from './repos/git-repo-watcher.js';

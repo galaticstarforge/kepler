@@ -4,7 +4,6 @@ import ts from 'typescript';
 
 import type {
   CallSiteData,
-  ExportsEdgeProps,
   ExternalPackageData,
   ExtractionResult,
   ImportsEdgeProps,
@@ -104,27 +103,34 @@ export class JsExtractor {
 
 function visitStatement(node: ts.Statement, ctx: VisitorCtx): void {
   switch (node.kind) {
-    case ts.SyntaxKind.ImportDeclaration:
+    case ts.SyntaxKind.ImportDeclaration: {
       visitImport(node as ts.ImportDeclaration, ctx);
       break;
-    case ts.SyntaxKind.ExportDeclaration:
+    }
+    case ts.SyntaxKind.ExportDeclaration: {
       visitExportDeclaration(node as ts.ExportDeclaration, ctx);
       break;
-    case ts.SyntaxKind.ExportAssignment:
+    }
+    case ts.SyntaxKind.ExportAssignment: {
       visitExportAssignment(node as ts.ExportAssignment, ctx);
       break;
-    case ts.SyntaxKind.FunctionDeclaration:
+    }
+    case ts.SyntaxKind.FunctionDeclaration: {
       visitFunctionDeclaration(node as ts.FunctionDeclaration, ctx);
       break;
-    case ts.SyntaxKind.ClassDeclaration:
+    }
+    case ts.SyntaxKind.ClassDeclaration: {
       visitClassDeclaration(node as ts.ClassDeclaration, ctx);
       break;
-    case ts.SyntaxKind.VariableStatement:
+    }
+    case ts.SyntaxKind.VariableStatement: {
       visitVariableStatement(node as ts.VariableStatement, ctx);
       break;
-    case ts.SyntaxKind.ExpressionStatement:
+    }
+    case ts.SyntaxKind.ExpressionStatement: {
       ctx.hasTopLevelSideEffect = true;
       break;
+    }
   }
 }
 
@@ -254,14 +260,12 @@ function visitVariableStatement(node: ts.VariableStatement, ctx: VisitorCtx): vo
     let isAsync = false;
     let isGenerator = false;
 
-    if (decl.initializer) {
-      if (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer)) {
-        kind = 'function';
-        isAsync = !!decl.initializer.modifiers?.some(
-          (m) => m.kind === ts.SyntaxKind.AsyncKeyword,
-        );
-        isGenerator = !!(decl.initializer as ts.FunctionExpression).asteriskToken;
-      }
+    if (decl.initializer && (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer))) {
+      kind = 'function';
+      isAsync = !!decl.initializer.modifiers?.some(
+        (m) => m.kind === ts.SyntaxKind.AsyncKeyword,
+      );
+      isGenerator = !!(decl.initializer as ts.FunctionExpression).asteriskToken;
     }
 
     ctx.symbols.push({
@@ -318,7 +322,7 @@ function resolveExports(ctx: VisitorCtx): void {
 
   // Names in separate export statements not already accounted for
   for (const name of ctx.exportedNames) {
-    if (!ctx.exports.find((e) => e.symbolName === name)) {
+    if (!ctx.exports.some((e) => e.symbolName === name)) {
       ctx.exports.push({
         symbolName: name,
         props: { exportName: name, isDefault: false },
@@ -327,7 +331,7 @@ function resolveExports(ctx: VisitorCtx): void {
   }
 
   // export default <identifier>
-  if (ctx.defaultExportedName && !ctx.exports.find((e) => e.props.isDefault)) {
+  if (ctx.defaultExportedName && !ctx.exports.some((e) => e.props.isDefault)) {
     ctx.exports.push({
       symbolName: ctx.defaultExportedName,
       props: { exportName: 'default', isDefault: true },
