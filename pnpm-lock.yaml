@@ -68,9 +68,6 @@ importers:
       '@kepler/installer':
         specifier: workspace:*
         version: link:../installer
-      '@kepler/shared':
-        specifier: workspace:*
-        version: link:../shared
       boxen:
         specifier: ^8.0.0
         version: 8.0.1
@@ -93,6 +90,9 @@ importers:
         specifier: ^2.6.0
         version: 2.8.3
     devDependencies:
+      '@kepler/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39
@@ -120,9 +120,6 @@ importers:
       '@aws-sdk/client-sqs':
         specifier: ^3.700.0
         version: 3.1030.0
-      '@kepler/shared':
-        specifier: workspace:^
-        version: link:../shared
       chokidar:
         specifier: ^4.0.0
         version: 4.0.3
@@ -136,6 +133,9 @@ importers:
         specifier: ^2.6.0
         version: 2.8.3
     devDependencies:
+      '@kepler/shared':
+        specifier: workspace:^
+        version: link:../shared
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39
@@ -154,9 +154,6 @@ importers:
       '@aws-sdk/client-cloudformation':
         specifier: ^3.700.0
         version: 3.1030.0
-      '@kepler/shared':
-        specifier: workspace:*
-        version: link:../shared
       aws-cdk:
         specifier: ^2.170.0
         version: 2.1118.0
@@ -170,6 +167,9 @@ importers:
         specifier: ^9.0.0
         version: 9.6.1
     devDependencies:
+      '@kepler/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39
