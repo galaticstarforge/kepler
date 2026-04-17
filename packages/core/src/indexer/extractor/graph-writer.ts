@@ -1,4 +1,4 @@
-import type { ExtractionResult } from '@kepler/shared';
+import type { BehavioralResult, ExtractionResult } from '@kepler/shared';
 
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
@@ -131,6 +131,79 @@ export class GraphWriter {
          })
          MERGE (m)-[:CONTAINS]->(c)`,
         { repo, filePath, callSites: result.callSites },
+      );
+    }
+  }
+
+  async writeBehavioral(repo: string, filePath: string, result: BehavioralResult): Promise<void> {
+    const step = (name: string) => ({ repo, filePath, step: name });
+
+    // Update module docstring
+    if (result.moduleDocstring) {
+      await this.run(
+        step('set-module-docstring'),
+        `MATCH (m:Module {repo: $repo, path: $filePath})
+         SET m.docstring = $docstring`,
+        { repo, filePath, docstring: result.moduleDocstring },
+      );
+    }
+
+    // Set behavioral properties on symbol nodes
+    if (result.symbolBehaviors.length > 0) {
+      await this.run(
+        step('set-symbol-behaviors'),
+        `UNWIND $behaviors AS b
+         MATCH (s:Symbol {repo: b.repo, filePath: b.filePath, name: b.name})
+         SET s.docstring        = b.docstring,
+             s.hasIO            = b.hasIO,
+             s.hasMutation      = b.hasMutation,
+             s.isPure           = b.isPure,
+             s.effectKinds      = b.effectKinds,
+             s.configKeysRead   = b.configKeysRead,
+             s.featureFlagsRead = b.featureFlagsRead,
+             s.throwTypes       = b.throwTypes`,
+        { behaviors: result.symbolBehaviors },
+      );
+    }
+
+    // Merge FlagDefinition nodes and READS_FLAG edges
+    for (const flag of result.flags) {
+      await this.run(
+        step('merge-flag'),
+        `MERGE (f:FlagDefinition {repo: $repo, name: $flagName})
+         SET f.providerHint = $providerHint
+         WITH f
+         MATCH (s:Symbol {repo: $repo, filePath: $filePath, name: $symbolName})
+         MERGE (s)-[r:READS_FLAG]->(f)
+         SET r.checkKind = $checkKind`,
+        {
+          repo: flag.repo,
+          flagName: flag.name,
+          providerHint: flag.providerHint,
+          filePath: flag.filePath,
+          symbolName: flag.symbolName,
+          checkKind: flag.checkKind,
+        },
+      );
+    }
+
+    // Merge ExternalService nodes and IMPORTS_SERVICE edges from the module
+    for (const svc of result.externalServices) {
+      await this.run(
+        step('merge-external-service'),
+        `MERGE (e:ExternalService {repo: $repo, name: $svcName})
+         SET e.protocol        = $protocol,
+             e.detectionMethod = $detectionMethod
+         WITH e
+         MATCH (m:Module {repo: $repo, path: $filePath})
+         MERGE (m)-[:IMPORTS_SERVICE]->(e)`,
+        {
+          repo: svc.repo,
+          svcName: svc.name,
+          protocol: svc.protocol,
+          detectionMethod: svc.detectionMethod,
+          filePath: svc.filePath,
+        },
       );
     }
   }

@@ -86,3 +86,60 @@ export interface ExtractionResult {
     props: ExportsEdgeProps;
   }>;
 }
+
+// ─── Behavioral extraction types ─────────────────────────────────────────────
+
+export type EffectKind =
+  | 'file-read'
+  | 'file-write'
+  | 'network-call'
+  | 'db-read'
+  | 'db-write'
+  | 'env-read'
+  | 'process-spawn'
+  | 'timer'
+  | 'dom-mutation';
+
+export type FlagProvider = 'launchdarkly' | 'unleash' | 'growthbook' | 'custom';
+export type FlagCheckKind = 'is-enabled' | 'variant' | 'kill-switch';
+export type ServiceProtocol = 'http' | 'grpc' | 'amqp' | 'graphql';
+export type ServiceDetectionMethod = 'sdk-import' | 'url-pattern' | 'client-constructor';
+
+export interface SymbolBehavior {
+  name: string;
+  filePath: string;
+  repo: string;
+  docstring: string | null;
+  hasIO: boolean;
+  hasMutation: boolean;
+  isPure: boolean;
+  effectKinds: EffectKind[];
+  configKeysRead: string[];
+  featureFlagsRead: string[];
+  throwTypes: string[];
+}
+
+export interface FlagDefinitionData {
+  name: string;
+  repo: string;
+  filePath: string;
+  symbolName: string;
+  providerHint: FlagProvider;
+  checkKind: FlagCheckKind;
+}
+
+export interface ExternalServiceData {
+  name: string;
+  repo: string;
+  filePath: string;
+  symbolName: string | null;
+  protocol: ServiceProtocol;
+  detectionMethod: ServiceDetectionMethod;
+}
+
+export interface BehavioralResult {
+  moduleDocstring: string | null;
+  symbolBehaviors: SymbolBehavior[];
+  flags: FlagDefinitionData[];
+  externalServices: ExternalServiceData[];
+}
