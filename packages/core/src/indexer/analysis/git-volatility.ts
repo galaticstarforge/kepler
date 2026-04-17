@@ -113,7 +113,7 @@ export class GitVolatilityPass {
         );
 
         const lastModified = entries[0]?.isoDate ?? null;
-        const firstCommit = entries[entries.length - 1]?.isoDate;
+        const firstCommit = entries.at(-1)?.isoDate;
         const gitAge = firstCommit
           ? Math.max(0, Math.floor((now.getTime() - new Date(firstCommit).getTime()) / 86_400_000))
           : 0;

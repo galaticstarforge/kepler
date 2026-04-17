@@ -1,14 +1,12 @@
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
 
-import { NotImplementedError } from './errors.js';
-
 export interface BoundedContextDeclaration {
   contextId: string;
   name: string;
   repo: string;
   description: string;
-  /** Path prefixes or explicit module patterns that belong to this context. */
+  /** Path prefixes that belong to this context. */
   patterns: string[];
   /**
    * Declaration order is significant: overlapping paths resolve to the first
@@ -35,9 +33,12 @@ export interface BoundedContextStats {
 }
 
 /**
- * Parses declared bounded contexts from `repos.yaml`, creates
- * `BoundedContext` nodes, and tags every symbol with the most specific
- * matching `boundedContextId`, emitting `IN_CONTEXT` edges.
+ * Parses declared bounded contexts, creates `BoundedContext` nodes, and
+ * tags every symbol with the most specific matching `boundedContextId`,
+ * emitting `IN_CONTEXT` edges.
+ *
+ * Bounded context declarations themselves are sourced from `repos.yaml`
+ * by the caller and passed in via `config.declarations`.
  *
  * See docs/graph/semantic-enrichment.md#bounded-context.
  */
@@ -49,37 +50,117 @@ export class BoundedContextPass {
   }
 
   async run(config: BoundedContextConfig): Promise<BoundedContextStats> {
-    this.log.info('bounded context pass requested but not implemented', {
-      repo: config.repo,
-      contexts: config.declarations.length,
+    const { repo, declarations } = config;
+    this.log.info('bounded context pass started', {
+      repo,
+      contexts: declarations.length,
     });
-    throw new NotImplementedError(
-      'Bounded context tagging pass',
-      'docs/graph/semantic-enrichment.md#bounded-context',
+
+    const sorted = [...declarations].sort(
+      (a, b) => a.declarationOrder - b.declarationOrder,
     );
+    const contextsCreated = await this.materializeContextNodes(repo, sorted);
+
+    const paths = await this.deps.graph.runRead(
+      `MATCH (m:Module {repo: $repo})-[:CONTAINS]->(s:Symbol)
+       RETURN s.filePath AS filePath, s.name AS name`,
+      { repo },
+      (r) => ({
+        filePath: r.get('filePath') as string,
+        name: r.get('name') as string,
+      }),
+    );
+
+    let ambiguousResolved = 0;
+    const assignments: Array<{ filePath: string; name: string; contextId: string }> = [];
+    for (const p of paths) {
+      const matches = sorted.filter((d) => this.matchesAny(p.filePath, d.patterns));
+      if (matches.length === 0) continue;
+      if (matches.length > 1) ambiguousResolved++;
+      assignments.push({
+        filePath: p.filePath,
+        name: p.name,
+        contextId: matches[0]!.contextId,
+      });
+    }
+
+    let symbolsTagged = 0;
+    if (assignments.length > 0) {
+      const rows = await this.deps.graph.runWrite(
+        `UNWIND $rows AS row
+         MATCH (s:Symbol {repo: $repo, filePath: row.filePath, name: row.name})
+         SET s.boundedContextId = row.contextId
+         RETURN count(s) AS n`,
+        { repo, rows: assignments },
+        (r) => Number(r.get('n')),
+      );
+      symbolsTagged = rows[0] ?? 0;
+    }
+
+    const inContextEdges = await this.writeInContextEdges(repo);
+
+    const stats: BoundedContextStats = {
+      contextsCreated,
+      symbolsTagged,
+      inContextEdges,
+      ambiguousResolved,
+    };
+    this.log.info('bounded context pass complete', { repo, ...stats });
+    return stats;
   }
 
   resolveContext(
-    _filePath: string,
-    _declarations: BoundedContextDeclaration[],
+    filePath: string,
+    declarations: BoundedContextDeclaration[],
   ): string | null {
-    throw new NotImplementedError(
-      'Bounded context resolution for a symbol',
-      'docs/graph/semantic-enrichment.md#bounded-context',
+    const sorted = [...declarations].sort(
+      (a, b) => a.declarationOrder - b.declarationOrder,
     );
+    for (const d of sorted) {
+      if (this.matchesAny(filePath, d.patterns)) return d.contextId;
+    }
+    return null;
   }
 
-  async materializeContextNodes(_repo: string, _decls: BoundedContextDeclaration[]): Promise<number> {
-    throw new NotImplementedError(
-      'BoundedContext node materialization from repos.yaml',
-      'docs/graph/semantic-enrichment.md#boundedcontext',
+  async materializeContextNodes(
+    repo: string,
+    declarations: BoundedContextDeclaration[],
+  ): Promise<number> {
+    if (declarations.length === 0) return 0;
+    const rows = await this.deps.graph.runWrite(
+      `UNWIND $decls AS d
+       MERGE (bc:BoundedContext {repo: $repo, contextId: d.contextId})
+       SET bc.name        = d.name,
+           bc.description = d.description
+       RETURN count(bc) AS n`,
+      { repo, decls: declarations },
+      (r) => Number(r.get('n')),
     );
+    return rows[0] ?? 0;
   }
 
-  async writeInContextEdges(_repo: string): Promise<number> {
-    throw new NotImplementedError(
-      'IN_CONTEXT edge creation',
-      'docs/graph/semantic-enrichment.md#in_context-symbol--boundedcontext',
+  async writeInContextEdges(repo: string): Promise<number> {
+    const rows = await this.deps.graph.runWrite(
+      `MATCH (s:Symbol {repo: $repo})
+       WHERE s.boundedContextId IS NOT NULL
+       MATCH (bc:BoundedContext {repo: $repo, contextId: s.boundedContextId})
+       MERGE (s)-[r:IN_CONTEXT]->(bc)
+       RETURN count(r) AS n`,
+      { repo },
+      (r) => Number(r.get('n')),
     );
+    return rows[0] ?? 0;
+  }
+
+  private matchesAny(filePath: string, patterns: string[]): boolean {
+    const normalized = filePath.replaceAll('\\', '/');
+    for (const pattern of patterns) {
+      if (pattern.endsWith('/')) {
+        if (normalized.startsWith(pattern)) return true;
+      } else if (normalized === pattern || normalized.startsWith(`${pattern}/`)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

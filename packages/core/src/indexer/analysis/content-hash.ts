@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import path from 'node:path';
 
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
@@ -82,7 +82,7 @@ export class SymbolContentHashPass {
     for (const [filePath, syms] of byFile) {
       let source: string;
       try {
-        source = await readFile(join(workingDir, filePath), 'utf8');
+        source = await readFile(path.join(workingDir, filePath), 'utf8');
       } catch {
         filesSkipped++;
         continue;

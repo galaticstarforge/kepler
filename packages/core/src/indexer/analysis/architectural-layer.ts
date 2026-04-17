@@ -99,9 +99,9 @@ export class ArchitecturalLayerPass {
 
   async run(config: LayerClassificationConfig): Promise<LayerClassificationStats> {
     const { repo } = config;
-    const rules = [...(config.rules ?? []), ...DEFAULT_LAYER_RULES]
-      .slice()
-      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    const rules = [...(config.rules ?? []), ...DEFAULT_LAYER_RULES].sort(
+      (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
+    );
 
     this.log.info('architectural layer pass started', { repo, ruleCount: rules.length });
 
@@ -148,10 +148,8 @@ export class ArchitecturalLayerPass {
   }
 
   classifyPath(filePath: string, rules: LayerRule[]): ArchitecturalLayerName {
-    const normalized = filePath.replace(/\\/g, '/');
-    const sorted = rules
-      .slice()
-      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    const normalized = filePath.replaceAll('\\', '/');
+    const sorted = [...rules].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
     for (const rule of sorted) {
       if (rule.pattern.test(normalized)) return rule.layer;
     }

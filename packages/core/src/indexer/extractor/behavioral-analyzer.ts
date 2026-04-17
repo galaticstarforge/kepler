@@ -433,7 +433,7 @@ function extractCatchInfo(clause: ts.CatchClause, sf: ts.SourceFile): CatchClaus
     const instanceType = findInstanceOfGuard(clause.block, sf, varName);
     if (instanceType) errorType = instanceType;
   }
-  const raw = clause.block.getText(sf).replace(/\s+/g, ' ').trim();
+  const raw = clause.block.getText(sf).replaceAll(/\s+/g, ' ').trim();
   const catchBlock = raw.length > 200 ? `${raw.slice(0, 197)}...` : raw;
   return { errorType, catchBlock };
 }

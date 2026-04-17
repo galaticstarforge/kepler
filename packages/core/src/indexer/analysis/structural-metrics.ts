@@ -44,7 +44,7 @@ export class StructuralMetricsPass {
 
   async run(config: StructuralMetricsConfig): Promise<StructuralMetricsStats> {
     const { repo } = config;
-    const projection = `${PROJECTION_PREFIX}${repo.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    const projection = `${PROJECTION_PREFIX}${repo.replaceAll(/[^a-zA-Z0-9]/g, '-')}`;
     this.log.info('structural metrics pass started', { repo, projection });
 
     await this.dropProjection(projection);
@@ -53,7 +53,7 @@ export class StructuralMetricsPass {
     try {
       const pr = config.pageRank ?? { maxIterations: 20, dampingFactor: 0.85 };
       const bt = config.betweenness ?? { samplingSize: 5000 };
-      const ld = config.leiden ?? { gamma: 1.0, theta: 0.01, maxLevels: 10 };
+      const ld = config.leiden ?? { gamma: 1, theta: 0.01, maxLevels: 10 };
 
       const pageRankWritten = await this.computePageRank(projection, pr);
       const betweennessWritten = await this.computeBetweenness(projection, bt);
