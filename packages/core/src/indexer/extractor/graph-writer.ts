@@ -206,6 +206,78 @@ export class GraphWriter {
         },
       );
     }
+
+    // Build edge rows from symbol behaviors.
+    const throwsRows: Array<{ name: string; errorType: string }> = [];
+    const catchesRows: Array<{ name: string; errorType: string; catchBlock: string }> = [];
+    const configReadRows: Array<{ name: string; key: string }> = [];
+    const serviceCallRows: Array<{ name: string; service: string }> = [];
+
+    for (const b of result.symbolBehaviors) {
+      for (const t of b.throwTypes) throwsRows.push({ name: b.name, errorType: t });
+      for (const c of b.catches)
+        catchesRows.push({ name: b.name, errorType: c.errorType, catchBlock: c.catchBlock });
+      for (const k of b.configKeysRead) configReadRows.push({ name: b.name, key: k });
+      for (const s of b.serviceCalls) serviceCallRows.push({ name: b.name, service: s });
+    }
+
+    // ErrorFlow nodes + THROWS edges
+    if (throwsRows.length > 0) {
+      await this.run(
+        step('throws-edges'),
+        `UNWIND $rows AS row
+         MERGE (e:ErrorFlow {repo: $repo, errorType: row.errorType})
+         WITH e, row
+         MATCH (s:Symbol {repo: $repo, filePath: $filePath, name: row.name})
+         MERGE (s)-[r:THROWS]->(e)
+         SET r.propagated = false,
+             r.confidence = 'exact'`,
+        { repo, filePath, rows: throwsRows },
+      );
+    }
+
+    // ErrorFlow nodes + CATCHES edges
+    if (catchesRows.length > 0) {
+      await this.run(
+        step('catches-edges'),
+        `UNWIND $rows AS row
+         MERGE (e:ErrorFlow {repo: $repo, errorType: row.errorType})
+         WITH e, row
+         MATCH (s:Symbol {repo: $repo, filePath: $filePath, name: row.name})
+         MERGE (s)-[r:CATCHES]->(e)
+         SET r.catchBlock = row.catchBlock`,
+        { repo, filePath, rows: catchesRows },
+      );
+    }
+
+    // ConfigItem nodes + READS_CONFIG edges
+    if (configReadRows.length > 0) {
+      await this.run(
+        step('reads-config-edges'),
+        `UNWIND $rows AS row
+         MERGE (c:ConfigItem {repo: $repo, key: row.key})
+         WITH c, row
+         MATCH (s:Symbol {repo: $repo, filePath: $filePath, name: row.name})
+         MERGE (s)-[r:READS_CONFIG]->(c)
+         SET r.accessPattern = 'direct',
+             r.confidence    = 'exact'`,
+        { repo, filePath, rows: configReadRows },
+      );
+    }
+
+    // Symbol-level CALLS_SERVICE edges
+    if (serviceCallRows.length > 0) {
+      await this.run(
+        step('calls-service-edges'),
+        `UNWIND $rows AS row
+         MATCH (e:ExternalService {repo: $repo, name: row.service})
+         MATCH (s:Symbol {repo: $repo, filePath: $filePath, name: row.name})
+         MERGE (s)-[r:CALLS_SERVICE]->(e)
+         SET r.protocol   = e.protocol,
+             r.confidence = 'exact'`,
+        { repo, filePath, rows: serviceCallRows },
+      );
+    }
   }
 
   private async run(

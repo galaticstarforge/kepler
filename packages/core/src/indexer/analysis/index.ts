@@ -51,15 +51,10 @@ export type {
   BehavioralEdgesConfig,
   BehavioralEdgesDeps,
   BehavioralEdgesStats,
-  CallsServiceEdge,
-  CatchesEdge,
   ConfigAccessPattern,
   ConfigConfidence,
   CoverageKind,
-  ReadsConfigEdge,
-  TestAssertsEdge,
   ThrowConfidence,
-  ThrowsEdge,
 } from './behavioral-edges.js';
 
 export { GovernsEdgesPass } from './governs-edges.js';

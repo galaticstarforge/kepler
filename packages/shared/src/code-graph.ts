@@ -117,6 +117,16 @@ export interface SymbolBehavior {
   configKeysRead: string[];
   featureFlagsRead: string[];
   throwTypes: string[];
+  catches: CatchClauseInfo[];
+  /** Services this symbol references via imported SDKs. */
+  serviceCalls: string[];
+}
+
+export interface CatchClauseInfo {
+  /** Error type the catch clause targets, or `Error` / `unknown` as a fallback. */
+  errorType: string;
+  /** Raw catch body text, truncated to 200 chars. */
+  catchBlock: string;
 }
 
 export interface FlagDefinitionData {
