@@ -1,5 +1,3 @@
-import ts from 'typescript';
-
 import type {
   BehavioralResult,
   EffectKind,
@@ -11,6 +9,7 @@ import type {
   SymbolBehavior,
   SymbolData,
 } from '@kepler/shared';
+import ts from 'typescript';
 
 // ─── SDK → service mapping ────────────────────────────────────────────────────
 
@@ -272,7 +271,7 @@ export class BehavioralAnalyzer {
       }
     });
 
-    const hasIO = Array.from(effectKinds).some((k) => IO_KINDS.has(k));
+    const hasIO = [...effectKinds].some((k) => IO_KINDS.has(k));
     const isPure = !hasIO && !hasMutation;
 
     return {
@@ -284,7 +283,7 @@ export class BehavioralAnalyzer {
         hasIO,
         hasMutation,
         isPure,
-        effectKinds: Array.from(effectKinds),
+        effectKinds: [...effectKinds],
         configKeysRead,
         featureFlagsRead,
         throwTypes,
@@ -391,7 +390,7 @@ function extractDocstring(node: ts.Node, sf: ts.SourceFile): string | null {
   while ((match = jsdocRegex.exec(trivia)) !== null) {
     lastMatch = match[1];
   }
-  return lastMatch !== null ? cleanJsDoc(lastMatch) : null;
+  return lastMatch === null ? null : cleanJsDoc(lastMatch);
 }
 
 function cleanJsDoc(raw: string): string | null {
