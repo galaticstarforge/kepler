@@ -45,7 +45,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @kepler/core build
+      - run: pnpm --filter @kepler/core... build
 
       - uses: docker/setup-buildx-action@v3
 
