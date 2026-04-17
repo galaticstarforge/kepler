@@ -6,3 +6,6 @@ export { JsExtractor } from './extractor/js-extractor.js';
 export type { JsExtractorConfig } from './extractor/js-extractor.js';
 export { GraphWriter } from './extractor/graph-writer.js';
 export type { GraphWriterDeps } from './extractor/graph-writer.js';
+
+// Documented-but-unimplemented analysis passes. See docs/graph/.
+export * from './analysis/index.js';

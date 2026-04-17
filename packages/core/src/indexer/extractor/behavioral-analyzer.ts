@@ -1,5 +1,6 @@
 import type {
   BehavioralResult,
+  CatchClauseInfo,
   EffectKind,
   ExternalServiceData,
   FlagCheckKind,
@@ -154,7 +155,8 @@ export class BehavioralAnalyzer {
     const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
     const moduleDocstring = extractModuleDocstring(sourceFile);
     const nodeMap = buildTopLevelNodeMap(sourceFile);
-    const externalServices = this.detectImportedServices(sourceFile, filePath);
+    const { services: externalServices, identifierToService } =
+      this.detectImportedServices(sourceFile, filePath);
 
     const symbolBehaviors: SymbolBehavior[] = [];
     const allFlags: FlagDefinitionData[] = [];
@@ -164,7 +166,14 @@ export class BehavioralAnalyzer {
       const entry = nodeMap.get(sym.name);
       if (!entry) continue;
 
-      const { behavior, flags } = this.analyzeSymbol(sym, entry.docNode, entry.bodyNode, sourceFile, filePath);
+      const { behavior, flags } = this.analyzeSymbol(
+        sym,
+        entry.docNode,
+        entry.bodyNode,
+        sourceFile,
+        filePath,
+        identifierToService,
+      );
       symbolBehaviors.push(behavior);
       allFlags.push(...flags);
     }
@@ -183,6 +192,7 @@ export class BehavioralAnalyzer {
     bodyNode: ts.Node,
     sf: ts.SourceFile,
     filePath: string,
+    identifierToService: Map<string, string>,
   ): { behavior: SymbolBehavior; flags: FlagDefinitionData[] } {
     const { repo } = this.config;
     const docstring = extractDocstring(docNode, sf);
@@ -199,6 +209,8 @@ export class BehavioralAnalyzer {
     const configKeysRead: string[] = [];
     const featureFlagsRead: string[] = [];
     const throwTypes: string[] = [];
+    const catches: CatchClauseInfo[] = [];
+    const serviceCalls = new Set<string>();
     const flags: FlagDefinitionData[] = [];
     let hasMutation = false;
 
@@ -249,6 +261,18 @@ export class BehavioralAnalyzer {
         if (errorType && !throwTypes.includes(errorType)) throwTypes.push(errorType);
       }
 
+      // catch (e: ErrorType) { ... }
+      if (ts.isCatchClause(n)) {
+        const info = extractCatchInfo(n, sf);
+        if (info) catches.push(info);
+      }
+
+      // Identifier references: track use of imported SDK symbols as service calls.
+      if (ts.isIdentifier(n)) {
+        const svc = identifierToService.get(n.text);
+        if (svc) serviceCalls.add(svc);
+      }
+
       // this.x = / += / -= / etc. (property mutation via assignment operators)
       if (
         ts.isBinaryExpression(n) &&
@@ -287,20 +311,32 @@ export class BehavioralAnalyzer {
         configKeysRead,
         featureFlagsRead,
         throwTypes,
+        catches,
+        serviceCalls: [...serviceCalls],
       },
       flags,
     };
   }
 
-  private detectImportedServices(sf: ts.SourceFile, filePath: string): ExternalServiceData[] {
+  private detectImportedServices(
+    sf: ts.SourceFile,
+    filePath: string,
+  ): {
+    services: ExternalServiceData[];
+    /** Local identifier (from the import) → normalized service name. */
+    identifierToService: Map<string, string>;
+  } {
     const services: ExternalServiceData[] = [];
     const seen = new Set<string>();
+    const identifierToService = new Map<string, string>();
 
     for (const stmt of sf.statements) {
       if (!ts.isImportDeclaration(stmt)) continue;
       const specifier = (stmt.moduleSpecifier as ts.StringLiteral).text;
       const entry = SDK_SERVICE_MAP[specifier];
-      if (entry && !seen.has(entry.name)) {
+      if (!entry) continue;
+
+      if (!seen.has(entry.name)) {
         seen.add(entry.name);
         services.push({
           name: entry.name,
@@ -311,9 +347,23 @@ export class BehavioralAnalyzer {
           detectionMethod: 'sdk-import',
         });
       }
+
+      const clause = stmt.importClause;
+      if (!clause) continue;
+      if (clause.name) identifierToService.set(clause.name.text, entry.name);
+      const bindings = clause.namedBindings;
+      if (bindings) {
+        if (ts.isNamespaceImport(bindings)) {
+          identifierToService.set(bindings.name.text, entry.name);
+        } else if (ts.isNamedImports(bindings)) {
+          for (const el of bindings.elements) {
+            identifierToService.set(el.name.text, entry.name);
+          }
+        }
+      }
     }
 
-    return services;
+    return { services, identifierToService };
   }
 }
 
@@ -366,7 +416,46 @@ function emptyBehavior(
     name, filePath, repo, docstring,
     hasIO: false, hasMutation: false, isPure,
     effectKinds: [], configKeysRead: [], featureFlagsRead: [], throwTypes: [],
+    catches: [], serviceCalls: [],
   };
+}
+
+// ─── Catch clause extraction ──────────────────────────────────────────────────
+
+function extractCatchInfo(clause: ts.CatchClause, sf: ts.SourceFile): CatchClauseInfo | null {
+  // Prefer a TypeScript type annotation if present: `catch (e: MyError)`.
+  let errorType = 'Error';
+  if (clause.variableDeclaration?.type) {
+    errorType = clause.variableDeclaration.type.getText(sf);
+  } else if (clause.variableDeclaration) {
+    // Look inside the catch block for `instanceof X` guards.
+    const varName = clause.variableDeclaration.name.getText(sf);
+    const instanceType = findInstanceOfGuard(clause.block, sf, varName);
+    if (instanceType) errorType = instanceType;
+  }
+  const raw = clause.block.getText(sf).replaceAll(/\s+/g, ' ').trim();
+  const catchBlock = raw.length > 200 ? `${raw.slice(0, 197)}...` : raw;
+  return { errorType, catchBlock };
+}
+
+function findInstanceOfGuard(
+  block: ts.Block,
+  sf: ts.SourceFile,
+  varName: string,
+): string | null {
+  let found: string | null = null;
+  walk(block, (n) => {
+    if (found) return;
+    if (
+      ts.isBinaryExpression(n) &&
+      n.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword &&
+      ts.isIdentifier(n.left) &&
+      n.left.text === varName
+    ) {
+      found = n.right.getText(sf);
+    }
+  });
+  return found;
 }
 
 // ─── Docstring extraction ─────────────────────────────────────────────────────
