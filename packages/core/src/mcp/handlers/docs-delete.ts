@@ -10,6 +10,10 @@ export async function docsDelete(
 
   await ctx.store.delete(docPath);
   await ctx.index.delete(docPath);
+  await ctx.graph.runWrite(
+    `MATCH (d:Document {path: $path}) DETACH DELETE d`,
+    { path: docPath },
+  );
 
   return textResponse(`Deleted document at "${docPath}".`);
 }

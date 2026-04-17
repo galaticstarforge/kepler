@@ -46,5 +46,26 @@ export async function docsCreate(
     await ctx.index.upsert({ path: docPath, content: plainText, metadata });
   }
 
+  await ctx.graph.runWrite(
+    `MERGE (d:Document {path: $path})
+     SET d.title    = $title,
+         d.type     = $type,
+         d.status   = $status,
+         d.author   = $author,
+         d.domain   = $domain,
+         d.service  = $service,
+         d.updatedAt = $updatedAt`,
+    {
+      path:      docPath,
+      title:     parsed.data.title   ?? null,
+      type:      parsed.data.type    ?? null,
+      status:    parsed.data.status  ?? null,
+      author:    parsed.data.author  ?? null,
+      domain:    parsed.data.domain  ?? null,
+      service:   parsed.data.service ?? null,
+      updatedAt: new Date().toISOString(),
+    },
+  );
+
   return textResponse(`Created document at "${docPath}".`);
 }
