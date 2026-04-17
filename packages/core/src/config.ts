@@ -47,6 +47,16 @@ export interface SourceAccessConfig {
   sshKeyPath?: string;
 }
 
+export interface OrchestratorConfig {
+  enabled: boolean;
+  maxConcurrentRepos: number;
+}
+
+export interface BaseExtractorConfig {
+  ignorePatterns: string[];
+  maxFileSizeBytes: number;
+}
+
 export interface CoreConfig {
   system: {
     name: string;
@@ -65,6 +75,8 @@ export interface CoreConfig {
   };
   enrichment: EnrichmentConfig;
   sourceAccess: SourceAccessConfig;
+  orchestrator: OrchestratorConfig;
+  baseExtractor: BaseExtractorConfig;
 }
 
 const DEFAULT_CONFIG: CoreConfig = {
@@ -91,6 +103,14 @@ const DEFAULT_CONFIG: CoreConfig = {
     cloneRoot: '/var/repos',
     fetchIntervalSeconds: 60,
   },
+  orchestrator: {
+    enabled: true,
+    maxConcurrentRepos: 1,
+  },
+  baseExtractor: {
+    ignorePatterns: ['node_modules', '.git', 'dist', 'build', 'coverage', '.cache'],
+    maxFileSizeBytes: 500_000,
+  },
 };
 
 export function loadConfig(path?: string): CoreConfig {
@@ -114,6 +134,8 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
   const observability = raw['observability'] as Partial<CoreConfig['observability']> | undefined;
   const enrichment = raw['enrichment'] as Record<string, unknown> | undefined;
   const sourceAccess = raw['sourceAccess'] as Partial<SourceAccessConfig> | undefined;
+  const orchestrator = raw['orchestrator'] as Partial<OrchestratorConfig> | undefined;
+  const baseExtractor = raw['baseExtractor'] as Partial<BaseExtractorConfig> | undefined;
 
   return {
     system: { ...defaults.system, ...system },
@@ -140,5 +162,7 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
       },
     },
     sourceAccess: { ...defaults.sourceAccess, ...sourceAccess },
+    orchestrator: { ...defaults.orchestrator, ...orchestrator },
+    baseExtractor: { ...defaults.baseExtractor, ...baseExtractor },
   };
 }

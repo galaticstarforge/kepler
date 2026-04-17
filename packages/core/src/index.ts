@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { loadConfig } from './config.js';
 import { TemplateManager } from './docs/template-manager.js';
+import { Orchestrator } from './indexer/index.js';
 import { ConceptExtractor } from './enrichment/concept-extractor.js';
 import { ConceptStore } from './enrichment/concept-store.js';
 import { EnrichmentRunner } from './enrichment/enrichment-runner.js';
@@ -100,6 +101,19 @@ if (config.sourceAccess.enabled) {
   }
 }
 
+// Code indexing orchestrator (optional; activates when source access and orchestrator are enabled).
+let orchestrator: Orchestrator | null = null;
+if (config.sourceAccess.enabled && config.orchestrator.enabled && repoWatcher) {
+  orchestrator = new Orchestrator({
+    watcher: repoWatcher,
+    graph,
+    config: config.orchestrator,
+    extractorConfig: config.baseExtractor,
+    logger: createLogger('orchestrator'),
+  });
+  orchestrator.start();
+}
+
 // Create MCP router with handler context.
 const router = new McpRouter({
   store,
@@ -122,6 +136,7 @@ const server = createHttpServer({
 
 function shutdown(signal: string): void {
   log.info('shutdown', { signal });
+  orchestrator?.stop();
   repoWatcher?.stop();
   server.close(() => {
     graph.close().finally(() => process.exit(0));
@@ -163,6 +178,7 @@ export { GitRepoWatcher } from './repos/git-repo-watcher.js';
 export { loadReposConfig, ReposConfigError } from './repos/repos-config.js';
 export type { RepoEntry, ReposConfig, ReposDefaults } from './repos/repos-config.js';
 export type { RepoUpdateEvent, RepoUpdateListener } from './repos/git-repo-watcher.js';
+export { Orchestrator, FileDiscovery, JsExtractor, GraphWriter } from './indexer/index.js';
 export {
   ConceptExtractor,
   ConceptStore,

@@ -1,0 +1,88 @@
+export type SymbolKind =
+  | 'function'
+  | 'class'
+  | 'variable'
+  | 'parameter'
+  | 'property'
+  | 'type'
+  | 'enum'
+  | 'namespace'
+  | 'interface';
+
+export type ScopeKind = 'function' | 'block' | 'module' | 'global';
+
+export type ExportKind = 'default' | 'named' | 'namespace';
+
+export type Mutability = 'const' | 'let' | 'var' | 'readonly';
+
+export type ModuleSystem = 'commonjs' | 'esm' | 'amd' | 'iife' | 'none' | 'mixed';
+
+export type ResolutionStatus = 'exact' | 'inferred' | 'heuristic' | 'unresolved';
+
+export interface ModuleData {
+  repo: string;
+  path: string;
+  language: string;
+  dialect: string;
+  hash: string;
+  loc: number;
+  hasSideEffects: boolean;
+  isBarrel: boolean;
+  moduleSystem: ModuleSystem;
+}
+
+export interface SymbolData {
+  name: string;
+  kind: SymbolKind;
+  scopeKind: ScopeKind;
+  isExported: boolean;
+  exportKind: ExportKind | null;
+  isAsync: boolean;
+  isGenerator: boolean;
+  mutability: Mutability | null;
+  lineStart: number;
+  lineEnd: number;
+  signature: string;
+  repo: string;
+  filePath: string;
+}
+
+export interface ExternalPackageData {
+  name: string;
+}
+
+export interface CallSiteData {
+  calleeExpression: string;
+  argumentCount: number;
+  isNewExpression: boolean;
+  line: number;
+  resolutionStatus: ResolutionStatus;
+  repo: string;
+  filePath: string;
+}
+
+export interface ImportsEdgeProps {
+  kind: 'value' | 'type' | 'namespace';
+  specifiers: string[];
+  line: number;
+}
+
+export interface ExportsEdgeProps {
+  exportName: string;
+  isDefault: boolean;
+}
+
+export interface ExtractionResult {
+  module: ModuleData;
+  symbols: SymbolData[];
+  externalPackages: ExternalPackageData[];
+  localImports: Array<{
+    targetPath: string;
+    props: ImportsEdgeProps;
+  }>;
+  callSites: CallSiteData[];
+  exports: Array<{
+    symbolName: string;
+    props: ExportsEdgeProps;
+  }>;
+}

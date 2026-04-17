@@ -1,3 +1,4 @@
+export * from './code-graph.js';
 export * from './concept.js';
 export * from './constants.js';
 export * from './document-store.js';
