@@ -10,6 +10,8 @@ import { EnrichmentRunner } from './enrichment/enrichment-runner.js';
 import { createLlmClient } from './enrichment/llm/llm-factory.js';
 import { createLogger, setLogLevel } from './logger.js';
 import { McpRouter } from './mcp/mcp-router.js';
+import { GitRepoWatcher } from './repos/git-repo-watcher.js';
+import { loadReposConfig } from './repos/repos-config.js';
 import { createSemanticIndex } from './semantic/semantic-index-factory.js';
 import { createHttpServer } from './server.js';
 import { createDocumentStore } from './storage/document-store-factory.js';
@@ -62,6 +64,26 @@ const enrichmentRunner = new EnrichmentRunner({
   config: config.enrichment.conceptExtraction,
 });
 
+// Git repo watcher (optional; activates when repos.yaml present and sourceAccess.enabled).
+let repoWatcher: GitRepoWatcher | null = null;
+if (config.sourceAccess.enabled) {
+  try {
+    const reposConfig = loadReposConfig();
+    if (reposConfig && reposConfig.repos.length > 0) {
+      repoWatcher = new GitRepoWatcher({
+        config: config.sourceAccess,
+        repos: reposConfig,
+        logger: createLogger('git-repo-watcher'),
+      });
+      repoWatcher.start().catch((error) => {
+        log.error('git repo watcher failed to start', { error: String(error) });
+      });
+    }
+  } catch (error) {
+    log.error('failed to load repos.yaml', { error: String(error) });
+  }
+}
+
 // Create MCP router with handler context.
 const router = new McpRouter({
   store,
@@ -83,6 +105,7 @@ const server = createHttpServer({
 
 function shutdown(signal: string): void {
   log.info('shutdown', { signal });
+  repoWatcher?.stop();
   server.close(() => {
     process.exit(0);
   });
@@ -116,6 +139,10 @@ export { parseFrontmatter } from './docs/frontmatter-parser.js';
 export { stripMarkdown } from './docs/markdown-stripper.js';
 export { createLogger, setLogLevel } from './logger.js';
 export { loadConfig } from './config.js';
+export { GitRepoWatcher } from './repos/git-repo-watcher.js';
+export { loadReposConfig, ReposConfigError } from './repos/repos-config.js';
+export type { RepoEntry, ReposConfig, ReposDefaults } from './repos/repos-config.js';
+export type { RepoUpdateEvent, RepoUpdateListener } from './repos/git-repo-watcher.js';
 export {
   ConceptExtractor,
   ConceptStore,

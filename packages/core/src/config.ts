@@ -32,6 +32,13 @@ export interface EnrichmentConfig {
   conceptExtraction: ConceptExtractionConfig;
 }
 
+export interface SourceAccessConfig {
+  enabled: boolean;
+  cloneRoot: string;
+  fetchIntervalSeconds: number;
+  sshKeyPath?: string;
+}
+
 export interface CoreConfig {
   system: {
     name: string;
@@ -48,6 +55,7 @@ export interface CoreConfig {
     logLevel: 'debug' | 'info' | 'warn' | 'error';
   };
   enrichment: EnrichmentConfig;
+  sourceAccess: SourceAccessConfig;
 }
 
 const DEFAULT_CONFIG: CoreConfig = {
@@ -67,6 +75,11 @@ const DEFAULT_CONFIG: CoreConfig = {
       similarityThreshold: 0.88,
       minDocChars: 400,
     },
+  },
+  sourceAccess: {
+    enabled: false,
+    cloneRoot: '/var/repos',
+    fetchIntervalSeconds: 60,
   },
 };
 
@@ -90,6 +103,7 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
   const mcp = raw['mcp'] as Partial<CoreConfig['mcp']> | undefined;
   const observability = raw['observability'] as Partial<CoreConfig['observability']> | undefined;
   const enrichment = raw['enrichment'] as Record<string, unknown> | undefined;
+  const sourceAccess = raw['sourceAccess'] as Partial<SourceAccessConfig> | undefined;
 
   return {
     system: { ...defaults.system, ...system },
@@ -111,5 +125,6 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
         ...(enrichment?.['conceptExtraction'] as Partial<ConceptExtractionConfig> | undefined),
       },
     },
+    sourceAccess: { ...defaults.sourceAccess, ...sourceAccess },
   };
 }
