@@ -32,6 +32,7 @@ storage:
 
 # Source repository access.
 sourceAccess:
+  enabled: true            # off by default; enable to start the watcher
   cloneRoot: /var/repos
   fetchIntervalSeconds: 60
   sshKeyPath: /root/.ssh/id_ed25519
@@ -115,6 +116,8 @@ repos:
       - build/**
       - public/assets/**
 ```
+
+Repo URLs must be SSH form (`git@host:org/repo.git` or `ssh://...`); HTTPS URLs are rejected. SSH host keys are accepted on first connect (TOFU) and recorded under `<cloneRoot>/.known_hosts` — to pin known hosts, pre-populate that file.
 
 ---
 
