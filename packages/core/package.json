@@ -24,7 +24,6 @@
     "@kepler/shared": "workspace:^",
     "@types/node": "^20.0.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.6.0",
     "vitest": "^2.0.0"
   },
   "dependencies": {
@@ -38,6 +37,7 @@
     "neo4j-driver": "^5.27.0",
     "remove-markdown": "^0.5.5",
     "simple-git": "^3.27.0",
+    "typescript": "^5.6.0",
     "yaml": "^2.6.0"
   }
 }

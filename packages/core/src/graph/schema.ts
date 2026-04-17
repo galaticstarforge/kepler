@@ -13,4 +13,5 @@ export const CORE_INDEX_STATEMENTS: readonly string[] = [
   'CREATE FULLTEXT INDEX comment_text_ft IF NOT EXISTS FOR (c:Comment) ON EACH [c.text]',
   'CREATE FULLTEXT INDEX literal_value_ft IF NOT EXISTS FOR (l:LiteralValue) ON EACH [l.rawValue]',
   'CREATE INDEX concept_lookup IF NOT EXISTS FOR (c:Concept) ON (c.id)',
+  'CREATE INDEX external_package_lookup IF NOT EXISTS FOR (p:ExternalPackage) ON (p.name)',
 ];
