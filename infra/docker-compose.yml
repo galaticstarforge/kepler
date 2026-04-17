@@ -1,0 +1,37 @@
+# Local development compose for Kepler.
+#
+# Phase 1 ships only the Neo4j service. Orchestrator, MCP server, and enrichment
+# cron are run on the host during dev (see packages/core) and will be added here
+# when the full deployment pipeline lands (see docs/deployment.md for the
+# eventual shape).
+#
+# Usage:
+#   docker compose -f infra/docker-compose.yml up -d
+#   docker compose -f infra/docker-compose.yml ps
+#   docker compose -f infra/docker-compose.yml down          # keeps volumes
+#   docker compose -f infra/docker-compose.yml down -v       # wipes data
+
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: kepler-neo4j
+    environment:
+      NEO4J_AUTH: none
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 2g
+      NEO4J_server_memory_pagecache_size: 1g
+    ports:
+      - "127.0.0.1:7687:7687"
+      - "127.0.0.1:7474:7474"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  neo4j-data:
+  neo4j-logs:

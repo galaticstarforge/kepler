@@ -5,6 +5,7 @@ import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { TemplateManager } from '../src/docs/template-manager.js';
+import type { GraphClient } from '../src/graph/graph-client.js';
 import { McpRouter } from '../src/mcp/mcp-router.js';
 import type { HandlerContext } from '../src/mcp/types.js';
 import { NoopSemanticIndex } from '../src/semantic/noop-semantic-index.js';
@@ -16,12 +17,13 @@ let router: McpRouter;
 beforeEach(async () => {
   tmpDir = await mkdtemp(path.join(os.tmpdir(), 'kepler-router-test-'));
   const store = new FilesystemDocumentStore(tmpDir);
-  const ctx: HandlerContext = {
+  const ctx = {
     store,
     index: new NoopSemanticIndex(),
+    graph: {} as unknown as GraphClient,
     templates: new TemplateManager(store),
     logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
-  };
+  } as unknown as HandlerContext;
   router = new McpRouter(ctx);
 });
 

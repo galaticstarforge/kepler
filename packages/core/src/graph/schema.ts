@@ -1,0 +1,15 @@
+export const CORE_INDEX_STATEMENTS: readonly string[] = [
+  'CREATE INDEX module_lookup IF NOT EXISTS FOR (m:Module) ON (m.repo, m.path)',
+  'CREATE INDEX symbol_lookup IF NOT EXISTS FOR (s:Symbol) ON (s.repo, s.filePath, s.name)',
+  'CREATE INDEX symbol_by_name IF NOT EXISTS FOR (s:Symbol) ON (s.name)',
+  'CREATE INDEX reference_location IF NOT EXISTS FOR (r:Reference) ON (r.repo, r.filePath, r.line)',
+  'CREATE INDEX callsite_location IF NOT EXISTS FOR (cs:CallSite) ON (cs.repo, cs.filePath, cs.line)',
+  'CREATE INDEX scope_lookup IF NOT EXISTS FOR (s:Scope) ON (s.repo, s.filePath, s.lineStart)',
+  'CREATE INDEX comment_type IF NOT EXISTS FOR (c:Comment) ON (c.kind)',
+  'CREATE INDEX document_path IF NOT EXISTS FOR (d:Document) ON (d.path)',
+  'CREATE INDEX document_type IF NOT EXISTS FOR (d:Document) ON (d.type, d.status)',
+  'CREATE INDEX document_service IF NOT EXISTS FOR (d:Document) ON (d.service)',
+  'CREATE FULLTEXT INDEX symbol_name_ft IF NOT EXISTS FOR (s:Symbol) ON EACH [s.name, s.signature]',
+  'CREATE FULLTEXT INDEX comment_text_ft IF NOT EXISTS FOR (c:Comment) ON EACH [c.text]',
+  'CREATE FULLTEXT INDEX literal_value_ft IF NOT EXISTS FOR (l:LiteralValue) ON EACH [l.rawValue]',
+];
