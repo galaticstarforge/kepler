@@ -57,8 +57,8 @@ describe('embedding round-trip', () => {
     const original = Float32Array.from([0.1, -0.5, 2.3, 1e-6]);
     const roundTripped = decodeEmbedding(encodeEmbedding(original));
     expect(roundTripped.length).toBe(original.length);
-    for (let i = 0; i < original.length; i++) {
-      expect(roundTripped[i]).toBeCloseTo(original[i]!, 6);
+    for (const [i, value] of original.entries()) {
+      expect(roundTripped[i]).toBeCloseTo(value, 6);
     }
   });
 });

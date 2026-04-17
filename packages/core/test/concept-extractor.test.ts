@@ -2,9 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ConceptExtractor } from '../src/enrichment/concept-extractor.js';
 import type {
-  CompletionRequest,
   CompletionResponse,
-  EmbeddingRequest,
   EmbeddingResponse,
   LlmClient,
 } from '../src/enrichment/llm/llm-client.js';
@@ -12,11 +10,11 @@ import type {
 function stubLlm(completions: string[]): LlmClient {
   const queue = [...completions];
   return {
-    complete(_req: CompletionRequest): Promise<CompletionResponse> {
+    complete(): Promise<CompletionResponse> {
       const next = queue.shift() ?? '{"concepts":[]}';
       return Promise.resolve({ text: next });
     },
-    embed(_req: EmbeddingRequest): Promise<EmbeddingResponse> {
+    embed(): Promise<EmbeddingResponse> {
       return Promise.resolve({ vector: new Float32Array(4), model: 'stub' });
     },
   };

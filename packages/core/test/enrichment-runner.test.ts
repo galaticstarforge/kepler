@@ -50,7 +50,7 @@ function stubLlm(conceptsPerCall: Array<{ name: string; description: string }[]>
     },
     embed(req): Promise<EmbeddingResponse> {
       // Distinct vectors per name, so dedup-by-embedding stays predictable.
-      const hash = Array.from(req.text).reduce((a, c) => a + c.charCodeAt(0), 0);
+      const hash = [...req.text].reduce((a, c) => a + (c.codePointAt(0) ?? 0), 0);
       const v = new Float32Array(8);
       for (let i = 0; i < v.length; i++) v[i] = (hash + i * 7) % 11;
       return Promise.resolve({ vector: v, model: 'stub' });
