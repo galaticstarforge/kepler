@@ -47,9 +47,22 @@ export interface SourceAccessConfig {
   sshKeyPath?: string;
 }
 
+export interface PassSettings {
+  enabled: boolean;
+  config?: Record<string, unknown>;
+}
+
+export type PassFailurePolicy = 'continue' | 'abort';
+
 export interface OrchestratorConfig {
   enabled: boolean;
   maxConcurrentRepos: number;
+  /** Default per-pass timeout applied when a pass registers without an explicit timeout. */
+  passTimeoutSeconds: number;
+  /** On pass error: `continue` runs siblings and records the failure; `abort` halts the run. */
+  passFailurePolicy: PassFailurePolicy;
+  /** Per-pass enable flag + opaque config bag, keyed by pass name. */
+  passes: Record<string, PassSettings>;
 }
 
 export interface BaseExtractorConfig {
@@ -106,6 +119,9 @@ const DEFAULT_CONFIG: CoreConfig = {
   orchestrator: {
     enabled: true,
     maxConcurrentRepos: 1,
+    passTimeoutSeconds: 300,
+    passFailurePolicy: 'continue',
+    passes: {},
   },
   baseExtractor: {
     ignorePatterns: ['node_modules', '.git', 'dist', 'build', 'coverage', '.cache'],
@@ -125,6 +141,32 @@ export function loadConfig(path?: string): CoreConfig {
   }
 
   return mergeConfig(DEFAULT_CONFIG, raw);
+}
+
+function mergeOrchestrator(
+  defaults: OrchestratorConfig,
+  raw: Partial<OrchestratorConfig> | undefined,
+): OrchestratorConfig {
+  if (!raw) return { ...defaults, passes: { ...defaults.passes } };
+  const passesRaw = (raw as { passes?: unknown }).passes;
+  const mergedPasses: Record<string, PassSettings> = { ...defaults.passes };
+  if (passesRaw && typeof passesRaw === 'object' && !Array.isArray(passesRaw)) {
+    for (const [name, settings] of Object.entries(passesRaw as Record<string, unknown>)) {
+      if (!settings || typeof settings !== 'object') continue;
+      const s = settings as Partial<PassSettings>;
+      mergedPasses[name] = {
+        enabled: s.enabled !== false,
+        ...(s.config === undefined ? {} : { config: s.config }),
+      };
+    }
+  }
+  return {
+    enabled: raw.enabled ?? defaults.enabled,
+    maxConcurrentRepos: raw.maxConcurrentRepos ?? defaults.maxConcurrentRepos,
+    passTimeoutSeconds: raw.passTimeoutSeconds ?? defaults.passTimeoutSeconds,
+    passFailurePolicy: raw.passFailurePolicy ?? defaults.passFailurePolicy,
+    passes: mergedPasses,
+  };
 }
 
 function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreConfig {
@@ -162,7 +204,7 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
       },
     },
     sourceAccess: { ...defaults.sourceAccess, ...sourceAccess },
-    orchestrator: { ...defaults.orchestrator, ...orchestrator },
+    orchestrator: mergeOrchestrator(defaults.orchestrator, orchestrator),
     baseExtractor: { ...defaults.baseExtractor, ...baseExtractor },
   };
 }

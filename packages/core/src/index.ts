@@ -10,7 +10,7 @@ import { EnrichmentRunner } from './enrichment/enrichment-runner.js';
 import { createLlmClient } from './enrichment/llm/llm-factory.js';
 import { createGraphClient } from './graph/graph-client-factory.js';
 import { CORE_INDEX_STATEMENTS } from './graph/schema.js';
-import { Orchestrator } from './indexer/index.js';
+import { DocumentStorePassRunHistoryStore, Orchestrator, PassRunner } from './indexer/index.js';
 import { createLogger, setLogLevel } from './logger.js';
 import { McpRouter } from './mcp/mcp-router.js';
 import { GitRepoWatcher } from './repos/git-repo-watcher.js';
@@ -104,11 +104,24 @@ if (config.sourceAccess.enabled) {
 // Code indexing orchestrator (optional; activates when source access and orchestrator are enabled).
 let orchestrator: Orchestrator | null = null;
 if (config.sourceAccess.enabled && config.orchestrator.enabled && repoWatcher) {
+  const passRunner = new PassRunner({
+    graph,
+    config: {
+      passTimeoutSeconds: config.orchestrator.passTimeoutSeconds,
+      passFailurePolicy: config.orchestrator.passFailurePolicy,
+      passes: config.orchestrator.passes,
+    },
+    historyStore: new DocumentStorePassRunHistoryStore(store),
+    logger: createLogger('pass-runner'),
+  });
+  // Phase A ships the runner itself. Individual passes are wired in phases B–F.
+
   orchestrator = new Orchestrator({
     watcher: repoWatcher,
     graph,
     config: config.orchestrator,
     extractorConfig: config.baseExtractor,
+    passRunner,
     logger: createLogger('orchestrator'),
   });
   orchestrator.start();
@@ -178,7 +191,27 @@ export { GitRepoWatcher } from './repos/git-repo-watcher.js';
 export { loadReposConfig, ReposConfigError } from './repos/repos-config.js';
 export type { RepoEntry, ReposConfig, ReposDefaults } from './repos/repos-config.js';
 export type { RepoUpdateEvent, RepoUpdateListener } from './repos/git-repo-watcher.js';
-export { Orchestrator, FileDiscovery, JsExtractor, GraphWriter } from './indexer/index.js';
+export {
+  Orchestrator,
+  FileDiscovery,
+  JsExtractor,
+  GraphWriter,
+  PassRunner,
+  DocumentStorePassRunHistoryStore,
+  NoopPassRunHistoryStore,
+} from './indexer/index.js';
+export type {
+  Pass,
+  PassContext,
+  PassRegisterOptions,
+  PassRunnerConfig,
+  PassRunnerDeps,
+  PassRunnerInput,
+  PassStats,
+  PassRunHistoryStore,
+  PassRunRecord,
+  PassRunStatus,
+} from './indexer/index.js';
 export {
   ConceptExtractor,
   ConceptStore,
