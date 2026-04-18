@@ -49,7 +49,7 @@ describe('summarization config', () => {
       embedding: { model: 'openai.text-embedding-3-large', dimensions: 3072 },
       maxRunCostUSD: 12.5,
       scheduleMinutes: 0,
-      priorityWeights: { pageRank: 0.4, fanIn: 0.3, publicApi: 0.2, changeFrequency: 0.1, canonicalPenalty: 1.0 },
+      priorityWeights: { pageRank: 0.4, fanIn: 0.3, publicApi: 0.2, changeFrequency: 0.1, canonicalPenalty: 1 },
     });
   });
 

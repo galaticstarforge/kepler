@@ -9,9 +9,11 @@ import {
 describe('CommunityPriorityQueue', () => {
   it('pops entries in descending score order', () => {
     const q = new CommunityPriorityQueue();
-    q.push({ communityId: 1, repo: 'r', score: 0.5 });
-    q.push({ communityId: 2, repo: 'r', score: 1.2 });
-    q.push({ communityId: 3, repo: 'r', score: 0.8 });
+    for (const entry of [
+      { communityId: 1, repo: 'r', score: 0.5 },
+      { communityId: 2, repo: 'r', score: 1.2 },
+      { communityId: 3, repo: 'r', score: 0.8 },
+    ]) q.push(entry);
 
     expect(q.pop()?.communityId).toBe(2); // highest
     expect(q.pop()?.communityId).toBe(3);
@@ -73,8 +75,8 @@ describe('computePriorityScore', () => {
   it('respects custom weights', () => {
     const score = computePriorityScore(
       { avgPageRank: 1, avgFanIn: 0, publicApiFraction: 0, avgChangeFrequency: 0, canonicalFraction: 0 },
-      { pageRank: 1.0, fanIn: 0, publicApi: 0, changeFrequency: 0, canonicalPenalty: 0 },
+      { pageRank: 1, fanIn: 0, publicApi: 0, changeFrequency: 0, canonicalPenalty: 0 },
     );
-    expect(score).toBeCloseTo(1.0);
+    expect(score).toBeCloseTo(1);
   });
 });
