@@ -1,4 +1,5 @@
 import { TOOL_HANDLERS } from './handlers/index.js';
+import { isServiceUnavailable } from './handlers/service-status.js';
 import type { HandlerContext, McpToolResponse } from './types.js';
 import { errorResponse } from './types.js';
 
@@ -12,6 +13,8 @@ export interface McpResponse {
   id?: string | number;
   result?: McpToolResponse;
   error?: { code: number; message: string };
+  /** Transport-level HTTP status hint; set when a tool signals service-unavailable. */
+  httpStatus?: number;
 }
 
 export class McpRouter {
@@ -42,6 +45,9 @@ export class McpRouter {
       }
 
       const result = await this.handleToolCall(toolName, toolParams);
+      if (isServiceUnavailable(result)) {
+        return { id: request.id, result, httpStatus: 503 };
+      }
       return { id: request.id, result };
     }
 

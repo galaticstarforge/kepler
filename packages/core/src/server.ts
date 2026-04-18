@@ -3,12 +3,20 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { Logger } from './logger.js';
 import { McpRouter, type McpRequest, type McpResponse } from './mcp/mcp-router.js';
 
+export interface ReadinessProbeResult {
+  ready: boolean;
+  details?: Record<string, unknown>;
+}
+
+export type ReadinessProbe = () => Promise<ReadinessProbeResult>;
+
 export interface ServerDeps {
   version: string;
   port: number;
   deploymentName: string;
   router: McpRouter;
   logger: Logger;
+  readinessProbe?: ReadinessProbe;
 }
 
 export function createHttpServer(deps: ServerDeps) {
@@ -33,7 +41,15 @@ export function createHttpServer(deps: ServerDeps) {
         break;
       }
       case '/ready': {
-        body = JSON.stringify({ ready: true });
+        if (deps.readinessProbe) {
+          const probe = await deps.readinessProbe();
+          status = probe.ready ? 200 : 503;
+          body = JSON.stringify(
+            probe.details ? { ready: probe.ready, ...probe.details } : { ready: probe.ready },
+          );
+        } else {
+          body = JSON.stringify({ ready: true });
+        }
         break;
       }
       case '/metrics': {
@@ -63,8 +79,16 @@ export function createHttpServer(deps: ServerDeps) {
         }
 
         const mcpResponse: McpResponse = await deps.router.handleRequest(mcpRequest);
-        status = mcpResponse.error ? 400 : 200;
-        body = JSON.stringify(mcpResponse);
+        if (mcpResponse.httpStatus) {
+          status = mcpResponse.httpStatus;
+        } else if (mcpResponse.error) {
+          status = 400;
+        } else {
+          status = 200;
+        }
+        const wireResponse: Record<string, unknown> = { ...mcpResponse };
+        delete wireResponse['httpStatus'];
+        body = JSON.stringify(wireResponse);
         break;
       }
       default: {

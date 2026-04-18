@@ -5,6 +5,7 @@ import type { ConceptStore } from '../enrichment/concept-store.js';
 import type { EnrichmentRunner } from '../enrichment/enrichment-runner.js';
 import type { GraphClient } from '../graph/graph-client.js';
 import type { Logger } from '../logger.js';
+import type { VectorIndexReadiness } from '../semantic/vector-index-readiness.js';
 
 export interface HandlerContext {
   store: DocumentStore;
@@ -14,6 +15,7 @@ export interface HandlerContext {
   conceptStore: ConceptStore;
   enrichmentRunner: EnrichmentRunner;
   logger: Logger;
+  vectorIndexReadiness?: VectorIndexReadiness;
 }
 
 export interface McpContentBlock {

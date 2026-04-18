@@ -9,7 +9,11 @@ import { ConceptStore } from './enrichment/concept-store.js';
 import { EnrichmentRunner } from './enrichment/enrichment-runner.js';
 import { createLlmClient } from './enrichment/llm/llm-factory.js';
 import { createGraphClient } from './graph/graph-client-factory.js';
-import { CORE_INDEX_STATEMENTS } from './graph/schema.js';
+import {
+  CORE_INDEX_STATEMENTS,
+  meetsVectorIndexMinimum,
+  MIN_NEO4J_VERSION_FOR_VECTOR,
+} from './graph/schema.js';
 import {
   ArchitecturalLayerPass,
   BehavioralEdgesWriter,
@@ -26,7 +30,9 @@ import { createLogger, setLogLevel } from './logger.js';
 import { McpRouter } from './mcp/mcp-router.js';
 import { GitRepoWatcher } from './repos/git-repo-watcher.js';
 import { loadReposConfig } from './repos/repos-config.js';
+import { EmbeddingModelRatchet } from './semantic/embedding-model-ratchet.js';
 import { createSemanticIndex } from './semantic/semantic-index-factory.js';
+import { VectorIndexReadiness } from './semantic/vector-index-readiness.js';
 import { createHttpServer } from './server.js';
 import { createDocumentStore } from './storage/document-store-factory.js';
 
@@ -59,15 +65,41 @@ const index = createSemanticIndex(config.storage.semanticIndex);
 
 // Neo4j graph client — connect and apply canonical indexes before accepting traffic.
 const graph = createGraphClient(config.storage.graph);
+let neo4jVersion = '';
 try {
   await graph.connect();
   log.info('neo4j connected', { bolt: config.storage.graph.bolt });
+  neo4jVersion = await graph.serverVersion();
+  if (!meetsVectorIndexMinimum(neo4jVersion)) {
+    throw new Error(
+      `Neo4j ${neo4jVersion} does not support native vector indexes; ` +
+        `upgrade to ${MIN_NEO4J_VERSION_FOR_VECTOR}+`,
+    );
+  }
+  log.info('neo4j version verified', { version: neo4jVersion });
   await graph.applySchema(CORE_INDEX_STATEMENTS);
   log.info('neo4j schema applied', { statements: CORE_INDEX_STATEMENTS.length });
 } catch (error) {
   log.error('neo4j startup failed', { bolt: config.storage.graph.bolt, error: String(error) });
   process.exit(1);
 }
+
+// Apply the embedding-model ratchet: installs or rotates vector indexes
+// based on the configured model + dimensions, persisted to the doc store.
+const embeddingRatchet = new EmbeddingModelRatchet({ graph, store });
+try {
+  const ratchetResult = await embeddingRatchet.apply(config.summarization.embedding);
+  log.info('vector indexes ensured', {
+    action: ratchetResult.action,
+    model: ratchetResult.current.model,
+    dimensions: ratchetResult.current.dimensions,
+  });
+} catch (error) {
+  log.error('vector index setup failed', { error: String(error) });
+  process.exit(1);
+}
+
+const vectorIndexReadiness = new VectorIndexReadiness({ graph });
 
 const templates = new TemplateManager(store);
 
@@ -180,6 +212,7 @@ const router = new McpRouter({
   conceptStore,
   enrichmentRunner,
   logger: createLogger('mcp'),
+  vectorIndexReadiness,
 });
 
 // Create and start HTTP server.
@@ -189,6 +222,17 @@ const server = createHttpServer({
   deploymentName: DEPLOYMENT_NAME,
   router,
   logger: createLogger('http'),
+  readinessProbe: async () => {
+    const snapshot = await vectorIndexReadiness.snapshot();
+    return {
+      ready: snapshot.ready,
+      details: {
+        neo4jVersion,
+        vectorIndexes: snapshot.indexes,
+        checkedAt: snapshot.checkedAt,
+      },
+    };
+  },
 });
 
 function shutdown(signal: string): void {
@@ -223,8 +267,31 @@ server.listen(PORT, () => {
 // Re-export public API for programmatic use.
 export { createDocumentStore } from './storage/document-store-factory.js';
 export { createSemanticIndex } from './semantic/semantic-index-factory.js';
-export { GraphClient, createGraphClient, CORE_INDEX_STATEMENTS } from './graph/index.js';
-export type { GraphClientOptions, AccessMode } from './graph/index.js';
+export {
+  GraphClient,
+  createGraphClient,
+  CORE_INDEX_STATEMENTS,
+  VECTOR_INDEX_NAMES,
+  MIN_NEO4J_VERSION_FOR_VECTOR,
+  compareSemver,
+  meetsVectorIndexMinimum,
+  vectorIndexStatements,
+  vectorIndexDropStatements,
+} from './graph/index.js';
+export type { GraphClientOptions, AccessMode, VectorIndexName } from './graph/index.js';
+export {
+  EmbeddingModelRatchet,
+  EMBEDDING_MODEL_META_PATH,
+  VectorIndexReadiness,
+} from './semantic/index.js';
+export type {
+  EmbeddingModelRatchetDeps,
+  EmbeddingModelRatchetResult,
+  EmbeddingModelRecord,
+  VectorIndexReadinessDeps,
+  VectorIndexReadinessSnapshot,
+  VectorIndexState,
+} from './semantic/index.js';
 export { McpRouter } from './mcp/mcp-router.js';
 export { TemplateManager } from './docs/template-manager.js';
 export { parseFrontmatter } from './docs/frontmatter-parser.js';
