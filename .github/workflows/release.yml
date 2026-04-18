@@ -28,6 +28,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @keplerforge/core... build
 
       - name: Get core version
         id: version
@@ -45,8 +46,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: packages/core/Dockerfile
+          context: packages/core
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/kepler-core:${{ steps.version.outputs.version }}
