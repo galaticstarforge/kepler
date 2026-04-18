@@ -47,6 +47,14 @@ export interface SummarizationEmbeddingConfig {
   dimensions: number;
 }
 
+export interface SummarizationPriorityWeights {
+  pageRank: number;
+  fanIn: number;
+  publicApi: number;
+  changeFrequency: number;
+  canonicalPenalty: number;
+}
+
 export interface SummarizationConfig {
   /** Model used for navigation/tool-use. */
   navigationModel: string;
@@ -55,6 +63,13 @@ export interface SummarizationConfig {
   embedding: SummarizationEmbeddingConfig;
   /** Cost ceiling (USD) for a single summarization run. 0 disables the check. */
   maxRunCostUSD: number;
+  /**
+   * Interval in minutes between scheduled full summarization runs.
+   * 0 or undefined disables scheduled runs.
+   */
+  scheduleMinutes: number;
+  /** Priority weights for community ordering. Defaults to spec values (w1..w5). */
+  priorityWeights: SummarizationPriorityWeights;
 }
 
 export interface SourceAccessConfig {
@@ -176,6 +191,14 @@ const DEFAULT_CONFIG: CoreConfig = {
       dimensions: 1536,
     },
     maxRunCostUSD: 0,
+    scheduleMinutes: 0,
+    priorityWeights: {
+      pageRank: 0.4,
+      fanIn: 0.3,
+      publicApi: 0.2,
+      changeFrequency: 0.1,
+      canonicalPenalty: 1,
+    },
   },
   sourceAccess: {
     enabled: false,
@@ -239,7 +262,13 @@ function mergeSummarization(
   defaults: SummarizationConfig,
   raw: Partial<SummarizationConfig> | undefined,
 ): SummarizationConfig {
-  if (!raw) return { ...defaults, embedding: { ...defaults.embedding } };
+  if (!raw) {
+    return {
+      ...defaults,
+      embedding: { ...defaults.embedding },
+      priorityWeights: { ...defaults.priorityWeights },
+    };
+  }
   return {
     navigationModel: raw.navigationModel ?? defaults.navigationModel,
     summaryModel: raw.summaryModel ?? defaults.summaryModel,
@@ -248,6 +277,11 @@ function mergeSummarization(
       ...(raw.embedding as Partial<SummarizationEmbeddingConfig> | undefined),
     },
     maxRunCostUSD: raw.maxRunCostUSD ?? defaults.maxRunCostUSD,
+    scheduleMinutes: raw.scheduleMinutes ?? defaults.scheduleMinutes,
+    priorityWeights: {
+      ...defaults.priorityWeights,
+      ...(raw.priorityWeights as Partial<SummarizationPriorityWeights> | undefined),
+    },
   };
 }
 

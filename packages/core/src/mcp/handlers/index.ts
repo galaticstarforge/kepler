@@ -7,6 +7,8 @@ import { adminPassRunHistory } from './admin-pass-run-history.js';
 import { adminPluginStatus } from './admin-plugin-status.js';
 import { adminRecomputeMetrics } from './admin-recompute-metrics.js';
 import { adminReindex } from './admin-reindex.js';
+import { adminSummarizationCoverage } from './admin-summarization-coverage.js';
+import { adminTriggerSummarization } from './admin-trigger-summarization.js';
 import { conceptsList } from './concepts-list.js';
 import { conceptsRead } from './concepts-read.js';
 import { docsApplyTemplate } from './docs-apply-template.js';
@@ -70,4 +72,6 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   'admin.passRunHistory': adminPassRunHistory,
   'admin.diagnostics': adminDiagnostics,
   'admin.recomputeMetrics': adminRecomputeMetrics,
+  'admin.triggerSummarization': adminTriggerSummarization,
+  'admin.summarizationCoverage': adminSummarizationCoverage,
 };

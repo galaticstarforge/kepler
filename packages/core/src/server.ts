@@ -6,6 +6,7 @@ import type { AuthStore } from './mcp/auth-store.js';
 import type { McpRequest, McpResponse, RequestMeta } from './mcp/mcp-router.js';
 import { McpRouter } from './mcp/mcp-router.js';
 import type { RateLimiter } from './mcp/rate-limiter.js';
+import type { SummarizationAgent } from './summarization/agent.js';
 
 export interface ReadinessProbeResult {
   ready: boolean;
@@ -23,6 +24,7 @@ export interface ServerDeps {
   readinessProbe?: ReadinessProbe;
   authStore?: AuthStore;
   rateLimiter?: RateLimiter;
+  summarizationAgent?: SummarizationAgent | null;
 }
 
 /** Extract `Bearer <token>` from the Authorization header. */
@@ -81,11 +83,26 @@ export function createHttpServer(deps: ServerDeps) {
       }
       case '/metrics': {
         contentType = 'text/plain';
-        body = [
+        const lines: string[] = [
           '# HELP kepler_core_uptime_seconds Time since server start in seconds',
           '# TYPE kepler_core_uptime_seconds counter',
           `kepler_core_uptime_seconds ${uptimeSeconds()}`,
-        ].join('\n') + '\n';
+        ];
+        if (deps.summarizationAgent) {
+          const g = deps.summarizationAgent.gauges;
+          lines.push(
+            '# HELP kepler_summarization_canonical_pct Percentage of symbols with canonical summaries',
+            '# TYPE kepler_summarization_canonical_pct gauge',
+            `kepler_summarization_canonical_pct ${g.canonicalPct.toFixed(2)}`,
+            '# HELP kepler_summarization_stale_count Number of stale canonical summaries',
+            '# TYPE kepler_summarization_stale_count gauge',
+            `kepler_summarization_stale_count ${g.staleCount}`,
+            '# HELP kepler_summarization_last_run_cost_usd Estimated cost of the last summarization run in USD',
+            '# TYPE kepler_summarization_last_run_cost_usd gauge',
+            `kepler_summarization_last_run_cost_usd ${g.lastRunCostUSD.toFixed(6)}`,
+          );
+        }
+        body = lines.join('\n') + '\n';
         break;
       }
 
