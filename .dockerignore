@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+.git
+.github
+**/.tsbuildinfo
+**/dist
+**/coverage
+packages/cli
+packages/installer
+packages/plugin-sdk
+docs
+*.md
