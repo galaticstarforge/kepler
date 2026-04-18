@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { Concept, EnrichmentRunRecord } from '@kepler/shared';
+import type { Concept, EnrichmentRunRecord } from '@keplerforge/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ConceptStore } from '../src/enrichment/concept-store.js';

@@ -80,7 +80,7 @@ When a user runs the CLI for the first time on a new machine, or runs `kepler di
 This is what makes second-user onboarding nearly instant. A new team member who has been granted IAM access to an existing deployment can get connected with two commands:
 
 ```bash
-$ npm install -g @kepler/cli
+$ npm install -g @keplerforge/cli
 $ kepler discover
 ✓ Found state bucket: kepler-state-7a3f9b
 ✓ Discovered 1 deployment: my-team-knowledge

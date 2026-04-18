@@ -1,4 +1,4 @@
-import type { DocumentMetadata, DocumentStore } from '@kepler/shared';
+import type { DocumentMetadata, DocumentStore } from '@keplerforge/shared';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 import type { GraphClient } from '../graph/graph-client.js';

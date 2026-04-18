@@ -1,6 +1,6 @@
 
-import { DOCUMENT_TYPES, DOCUMENT_STATUSES } from '@kepler/shared';
-import type { Frontmatter, FrontmatterParseResult } from '@kepler/shared';
+import { DOCUMENT_TYPES, DOCUMENT_STATUSES } from '@keplerforge/shared';
+import type { Frontmatter, FrontmatterParseResult } from '@keplerforge/shared';
 import matter from 'gray-matter';
 
 const REQUIRED_FIELDS: (keyof Frontmatter)[] = [

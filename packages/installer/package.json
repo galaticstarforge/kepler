@@ -1,5 +1,5 @@
 {
-  "name": "@kepler/installer",
+  "name": "@keplerforge/installer",
   "version": "1.0.0",
   "private": false,
   "type": "module",
@@ -28,7 +28,7 @@
     "execa": "^9.0.0"
   },
   "devDependencies": {
-    "@kepler/shared": "workspace:*",
+    "@keplerforge/shared": "workspace:*",
     "@types/node": "^20.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.6.0",

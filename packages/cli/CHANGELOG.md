@@ -1,4 +1,4 @@
-# @kepler/cli
+# @keplerforge/cli
 
 ## 1.0.0
 
@@ -9,4 +9,4 @@
 ### Patch Changes
 
 - Updated dependencies [51f8942]
-  - @kepler/installer@1.0.0
+  - @keplerforge/installer@1.0.0

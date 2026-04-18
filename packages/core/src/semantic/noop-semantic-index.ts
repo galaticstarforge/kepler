@@ -4,7 +4,7 @@ import type {
   SearchOptions,
   SearchResult,
   SemanticIndex,
-} from '@kepler/shared';
+} from '@keplerforge/shared';
 
 /**
  * No-op semantic index for testing and deployments where semantic

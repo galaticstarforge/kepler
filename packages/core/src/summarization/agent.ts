@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import type { DocumentStore } from '@kepler/shared';
+import type { DocumentStore } from '@keplerforge/shared';
 
 import type { LlmClient } from '../enrichment/llm/llm-client.js';
 import type { GraphClient } from '../graph/graph-client.js';

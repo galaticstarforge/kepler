@@ -19,4 +19,4 @@ export type {
   ReferenceData,
   ReferenceBindingKind,
   ReferenceConfidence,
-} from '@kepler/shared';
+} from '@keplerforge/shared';

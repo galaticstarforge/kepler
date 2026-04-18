@@ -1,4 +1,4 @@
-import { EnrichmentError } from '@kepler/shared';
+import { EnrichmentError } from '@keplerforge/shared';
 
 import type { CompletionResponse, EmbeddingResponse, LlmClient } from './llm-client.js';
 

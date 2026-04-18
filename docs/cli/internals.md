@@ -103,7 +103,7 @@ Clients used:
 
 ## CDK Integration
 
-CDK is consumed as a library, not invoked as a separate CLI process. The `@kepler/installer` package exports a deploy function that:
+CDK is consumed as a library, not invoked as a separate CLI process. The `@keplerforge/installer` package exports a deploy function that:
 
 1. Constructs a `cdk.App` in-memory with the requested config.
 2. Adds a single `KeplerStack` with the appropriate constructs.
@@ -141,7 +141,7 @@ Runtime dependencies are kept minimal:
 - `boxen`: callout boxes.
 - `yaml`: YAML parsing.
 - `execa`: subprocess invocation (for SSM plugin shell-out).
-- `aws-cdk-lib`, `aws-cdk`, `constructs`: CDK (via `@kepler/installer`).
+- `aws-cdk-lib`, `aws-cdk`, `constructs`: CDK (via `@keplerforge/installer`).
 - AWS SDK v3 modular clients (per above).
 
 No large frameworks. No oclif, no AWS Amplify CLI, no Terraform. The CLI is purpose-built and the dependency list should stay that way.

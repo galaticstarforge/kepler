@@ -7,7 +7,7 @@ import type {
   DocumentMetadata,
   DocumentStore,
   DocumentStoreEvent,
-} from '@kepler/shared';
+} from '@keplerforge/shared';
 import { watch as chokidarWatch } from 'chokidar';
 
 

@@ -1,4 +1,4 @@
-import type { DocumentStore } from '@kepler/shared';
+import type { DocumentStore } from '@keplerforge/shared';
 
 import { parseFrontmatter } from '../../docs/frontmatter-parser.js';
 import type { GraphClient } from '../../graph/graph-client.js';

@@ -1,4 +1,4 @@
-# @kepler/installer
+# @keplerforge/installer
 
 ## 1.0.0
 

@@ -1,4 +1,4 @@
-import { PROPOSALS_PREFIX } from '@kepler/shared';
+import { PROPOSALS_PREFIX } from '@keplerforge/shared';
 
 import { parseFrontmatter } from '../../docs/frontmatter-parser.js';
 import { stripMarkdown } from '../../docs/markdown-stripper.js';

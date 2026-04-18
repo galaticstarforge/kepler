@@ -289,7 +289,7 @@ async function restartKeplerService(
   state: { stateBucket: string; region: string },
   deploymentName: string,
 ): Promise<void> {
-  const { getStatus } = await import('@kepler/installer');
+  const { getStatus } = await import('@keplerforge/installer');
   const status = await getStatus(deploymentName, state.region);
   if (!status?.instanceId) {
     logger.warn('Could not determine instance ID — skipping service restart.');

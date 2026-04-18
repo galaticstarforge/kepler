@@ -1,5 +1,5 @@
 {
-  "name": "@kepler/core",
+  "name": "@keplerforge/core",
   "version": "1.0.0",
   "private": false,
   "type": "module",
@@ -21,7 +21,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "devDependencies": {
-    "@kepler/shared": "workspace:^",
+    "@keplerforge/shared": "workspace:^",
     "@types/node": "^20.0.0",
     "tsup": "^8.0.0",
     "vitest": "^2.0.0"

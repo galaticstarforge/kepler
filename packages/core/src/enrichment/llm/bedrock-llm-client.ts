@@ -1,5 +1,5 @@
 import { InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { EnrichmentError } from '@kepler/shared';
+import { EnrichmentError } from '@keplerforge/shared';
 
 import { getBedrockRuntimeClient } from '../../aws-clients.js';
 import { createLogger } from '../../logger.js';

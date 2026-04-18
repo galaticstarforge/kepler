@@ -3,8 +3,8 @@ import {
   diff,
   getStatus,
   type DeploymentConfig,
-} from '@kepler/installer';
-import { KEPLER_VERSION } from '@kepler/shared';
+} from '@keplerforge/installer';
+import { KEPLER_VERSION } from '@keplerforge/shared';
 import { Command } from 'commander';
 import ora from 'ora';
 
@@ -59,7 +59,7 @@ export const deployCommand = new Command('deploy')
             logger.info('Aborted.');
             return;
           }
-          const { destroy } = await import('@kepler/installer');
+          const { destroy } = await import('@keplerforge/installer');
           const spinner = ora('Cleaning up failed stack...').start();
           await destroy(deploymentName, region, (msg) => { spinner.text = msg; });
           spinner.succeed('Old stack removed.');

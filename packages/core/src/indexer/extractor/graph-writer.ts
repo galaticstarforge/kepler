@@ -1,4 +1,4 @@
-import type { BehavioralResult, ExtractionResult } from '@kepler/shared';
+import type { BehavioralResult, ExtractionResult } from '@keplerforge/shared';
 
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';

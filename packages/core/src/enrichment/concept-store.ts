@@ -2,12 +2,12 @@ import type {
   Concept,
   DocumentStore,
   EnrichmentRunRecord,
-} from '@kepler/shared';
+} from '@keplerforge/shared';
 import {
   CONCEPTS_PREFIX,
   CONCEPT_RUNS_PREFIX,
   EnrichmentError,
-} from '@kepler/shared';
+} from '@keplerforge/shared';
 
 import { createLogger } from '../logger.js';
 

@@ -1,5 +1,5 @@
-import type { SearchOptions } from '@kepler/shared';
-import { CONCEPTS_PREFIX, SCRATCHPAD_PREFIX } from '@kepler/shared';
+import type { SearchOptions } from '@keplerforge/shared';
+import { CONCEPTS_PREFIX, SCRATCHPAD_PREFIX } from '@keplerforge/shared';
 
 import type { HandlerContext, McpToolResponse } from '../types.js';
 import { structuredResponse, textResponse } from '../types.js';

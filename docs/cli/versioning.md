@@ -12,7 +12,7 @@ Semantic versioning. Major, minor, patch.
 
 ## Runtime Version Pinning
 
-Each CLI version pins a specific runtime version. Installing `@kepler/cli@0.3.2` means deployments use `ghcr.io/<org>/kepler-core:0.3.2`. The pinning is embedded in the CDK stack templates.
+Each CLI version pins a specific runtime version. Installing `@keplerforge/cli@0.3.2` means deployments use `ghcr.io/<org>/kepler-core:0.3.2`. The pinning is embedded in the CDK stack templates.
 
 I think this is the right approach. Tag-chasing `latest` would cause silent behavior changes across unrelated `deploy` invocations. Explicit pinning makes each `deploy` reproducible and debuggable. If something changes between runs, the CLI version is the reason.
 
@@ -22,7 +22,7 @@ I think this is the right approach. Tag-chasing `latest` would cause silent beha
 
 User upgrades follow a specific order:
 
-1. Install a newer CLI: `npm install -g @kepler/cli@latest`.
+1. Install a newer CLI: `npm install -g @keplerforge/cli@latest`.
 2. Run `kepler upgrade` to confirm the new version is healthy and review what changed.
 3. Run `kepler deploy <name>` to apply the new runtime version to the existing deployment. This triggers a CloudFormation update, restarts the container on the EC2 instance, and updates the version reported by `kepler status`.
 

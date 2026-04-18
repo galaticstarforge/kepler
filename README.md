@@ -5,7 +5,7 @@ Neo4j-backed code graph and markdown knowledge base with an MCP server for AI co
 ## Quick Start
 
 ```bash
-npm install -g @kepler/cli
+npm install -g @keplerforge/cli
 kepler init
 kepler deploy my-deployment
 kepler tunnel
@@ -32,18 +32,18 @@ curl http://localhost:8080/health
 
 | Package | Description |
 |---------|-------------|
-| [@kepler/cli](packages/cli) | Command-line interface |
-| [@kepler/core](packages/core) | Core runtime server |
-| [@kepler/installer](packages/installer) | AWS CDK infrastructure |
-| [@kepler/plugin-sdk](packages/plugin-sdk) | Plugin development SDK |
-| [@kepler/shared](packages/shared) | Shared types and utilities |
+| [@keplerforge/cli](packages/cli) | Command-line interface |
+| [@keplerforge/core](packages/core) | Core runtime server |
+| [@keplerforge/installer](packages/installer) | AWS CDK infrastructure |
+| [@keplerforge/plugin-sdk](packages/plugin-sdk) | Plugin development SDK |
+| [@keplerforge/shared](packages/shared) | Shared types and utilities |
 
 ## Multi-user Access
 
 A second user can connect to an existing deployment:
 
 ```bash
-npm install -g @kepler/cli
+npm install -g @keplerforge/cli
 kepler discover
 kepler tunnel
 ```

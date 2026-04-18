@@ -152,7 +152,7 @@ Open an interactive SSM shell on the deployment's EC2 instance. See [connectivit
 
 Package and upload a plugin.
 
-**Behavior:** validates that `<path>` points to a Node package with a valid `package.json`, runs `npm pack` to produce a tarball, uploads it to the state bucket under `deployments/<name>/plugins/packages/`, and validates that the plugin declares a Kepler plugin manifest via `@kepler/plugin-sdk`. Rejects if the manifest is missing. Uploading does not enable the plugin. That's a separate step.
+**Behavior:** validates that `<path>` points to a Node package with a valid `package.json`, runs `npm pack` to produce a tarball, uploads it to the state bucket under `deployments/<name>/plugins/packages/`, and validates that the plugin declares a Kepler plugin manifest via `@keplerforge/plugin-sdk`. Rejects if the manifest is missing. Uploading does not enable the plugin. That's a separate step.
 
 ### `kepler plugin enable <name>`
 
@@ -229,9 +229,9 @@ Kepler CLI v0.3.2
 
 Check for a newer CLI version on npm and report whether the CLI version matches the deployed runtime version.
 
-**Behavior:** checks npm for the latest `@kepler/cli` version, compares to the installed version, and compares the installed CLI version to the deployed runtime version from CloudFormation outputs. Prints status and instructions.
+**Behavior:** checks npm for the latest `@keplerforge/cli` version, compares to the installed version, and compares the installed CLI version to the deployed runtime version from CloudFormation outputs. Prints status and instructions.
 
-This command does not upgrade anything itself. It runs diagnostic checks and prints `npm install -g @kepler/cli@latest` as the upgrade instruction. For runtime upgrades, the user runs `kepler deploy <name>` with the new CLI, which pulls the matching runtime image.
+This command does not upgrade anything itself. It runs diagnostic checks and prints `npm install -g @keplerforge/cli@latest` as the upgrade instruction. For runtime upgrades, the user runs `kepler deploy <name>` with the new CLI, which pulls the matching runtime image.
 
 ---
 

@@ -1,4 +1,4 @@
-import type { DocumentStore } from '@kepler/shared';
+import type { DocumentStore } from '@keplerforge/shared';
 
 import type { Logger } from '../logger.js';
 

@@ -1,4 +1,4 @@
-import { getStatus } from '@kepler/installer';
+import { getStatus } from '@keplerforge/installer';
 import { Command } from 'commander';
 
 import { writeLocalState, getRegion } from '../lib/config.js';

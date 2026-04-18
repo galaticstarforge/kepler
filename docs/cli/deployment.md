@@ -123,8 +123,8 @@ Detection is done by attempting `CloudFormation:DescribeStacks` for `CDKToolkit`
 
 ## Runtime Container Image
 
-`@kepler/core` publishes a Docker container image to GitHub Container Registry at `ghcr.io/<org>/kepler-core:<version>`. The EC2 user-data script pulls this image during instance boot and runs it via Docker Compose.
+`@keplerforge/core` publishes a Docker container image to GitHub Container Registry at `ghcr.io/<org>/kepler-core:<version>`. The EC2 user-data script pulls this image during instance boot and runs it via Docker Compose.
 
-The image tag is determined by the CLI's own version. Installing `@kepler/cli@0.3.2` means deployments embed `ghcr.io/<org>/kepler-core:0.3.2`. This pinning guarantees reproducibility. Re-deploying the same CLI version always produces the same runtime image.
+The image tag is determined by the CLI's own version. Installing `@keplerforge/cli@0.3.2` means deployments embed `ghcr.io/<org>/kepler-core:0.3.2`. This pinning guarantees reproducibility. Re-deploying the same CLI version always produces the same runtime image.
 
 The image is public. Anyone can pull it; authentication is not required. The image does nothing useful without a Kepler deployment's configuration, so public availability does not leak information.
