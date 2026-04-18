@@ -183,7 +183,7 @@ export class DocGraphReconciler {
     } catch (error) {
       this.log.error('run failed', { runId: record.runId, error: String(error) });
       record.status = 'failed';
-      record.error = String(err);
+      record.error = String(error);
     } finally {
       record.finishedAt = new Date().toISOString();
       record.durationMs = Date.now() - started;
