@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
+import type { Logger } from './logger.js';
 import type { AuthStore } from './mcp/auth-store.js';
 import type { McpRequest, McpResponse, RequestMeta } from './mcp/mcp-router.js';
 import { McpRouter } from './mcp/mcp-router.js';
 import type { RateLimiter } from './mcp/rate-limiter.js';
-import type { Logger } from './logger.js';
 
 export interface ReadinessProbeResult {
   ready: boolean;
@@ -132,10 +132,10 @@ export function createHttpServer(deps: ServerDeps) {
 
         // Keep-alive heartbeat every 30 s.
         const heartbeat = setInterval(() => {
-          if (!res.writableEnded) {
-            res.write(': keepalive\n\n');
-          } else {
+          if (res.writableEnded) {
             clearInterval(heartbeat);
+          } else {
+            res.write(': keepalive\n\n');
           }
         }, 30_000);
 

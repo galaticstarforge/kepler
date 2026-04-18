@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
+import { AuthStore } from './auth-store.js';
 import { TOOL_HANDLERS } from './handlers/index.js';
 import { isServiceUnavailable } from './handlers/service-status.js';
-import { AuthStore } from './auth-store.js';
 import type { HandlerContext, McpToolResponse } from './types.js';
 import { errorResponse } from './types.js';
 

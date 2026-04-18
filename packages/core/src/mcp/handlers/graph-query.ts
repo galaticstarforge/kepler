@@ -5,7 +5,7 @@ const MUTATION_PATTERN =
   /\b(CREATE|MERGE|SET|DELETE|DETACH\s+DELETE|REMOVE|DROP|CALL\s+db\.)\b/i;
 
 const QUERY_TIMEOUT_MS = 10_000;
-const MAX_ROWS = 1_000;
+const MAX_ROWS = 1000;
 
 export async function graphQuery(
   params: Record<string, unknown>,
