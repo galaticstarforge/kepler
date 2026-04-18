@@ -71,9 +71,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
 
-      - uses: changesets/action@v1
+      - name: Publish to npm
+        uses: changesets/action@v1
         with:
-          publish: pnpm changeset publish -- --no-git-checks
+          publish: pnpm exec changeset publish --no-git-checks
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
