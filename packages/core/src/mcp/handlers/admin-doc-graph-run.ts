@@ -1,5 +1,5 @@
 import type { HandlerContext, McpToolResponse } from '../types.js';
-import { errorResponse, structuredResponse, textResponse } from '../types.js';
+import { errorResponse, structuredResponse } from '../types.js';
 
 export async function adminDocGraphRun(
   params: Record<string, unknown>,

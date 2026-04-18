@@ -107,8 +107,8 @@ export class DocGraphReconciler {
     };
     await this.saveRunRecord(record);
 
-    void this.run(record, opts).catch((err: unknown) => {
-      this.log.error('unhandled reconciler failure', { runId, error: String(err) });
+    void this.run(record, opts).catch((error: unknown) => {
+      this.log.error('unhandled reconciler failure', { runId, error: String(error) });
     });
 
     return record;
@@ -174,14 +174,14 @@ export class DocGraphReconciler {
           stats.edgesWritten += result.edgesWritten;
           if (result.docUpdated) stats.docsUpdated++;
           unresolvedReferences.push(...result.unresolved);
-        } catch (err) {
-          stats.errors.push(`process ${head.path}: ${String(err)}`);
+        } catch (error) {
+          stats.errors.push(`process ${head.path}: ${String(error)}`);
         }
       }
 
       record.status = 'completed';
-    } catch (err) {
-      this.log.error('run failed', { runId: record.runId, error: String(err) });
+    } catch (error) {
+      this.log.error('run failed', { runId: record.runId, error: String(error) });
       record.status = 'failed';
       record.error = String(err);
     } finally {
@@ -649,7 +649,7 @@ export class DocGraphReconciler {
       { path: docPath },
       (r) => {
         const v = r.get('h');
-        return v != null ? String(v) : null;
+        return v == null ? null : String(v);
       },
     );
     return rows[0] ?? null;
@@ -751,8 +751,7 @@ function runRecordPath(runId: string): string {
 }
 
 function pathSegment(importPath: string): string {
-  const parts = importPath.split('/');
-  const last = parts[parts.length - 1] ?? '';
+  const last = importPath.split('/').at(-1) ?? '';
   return last.replace(/\.[^.]+$/, '');
 }
 

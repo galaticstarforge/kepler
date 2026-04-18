@@ -40,8 +40,8 @@ export class DocGraphScheduler {
 
     this.timer = setInterval(() => {
       this.log.info('scheduled doc-graph reconciler run triggered');
-      void this.deps.reconciler.start(cfg.runOptions ?? {}).catch((err: unknown) => {
-        this.log.error('scheduled reconciler run failed to start', { error: String(err) });
+      void this.deps.reconciler.start(cfg.runOptions ?? {}).catch((error: unknown) => {
+        this.log.error('scheduled reconciler run failed to start', { error: String(error) });
       });
     }, intervalMs);
 

@@ -175,11 +175,9 @@ describe('DocGraphReconciler', () => {
     const stubGraph = makeStubGraph({ writes });
 
     // Override runRead to return the current hash so the doc appears unchanged.
-    let readCount = 0;
     const graph = {
       ...stubGraph,
-      async runRead(cypher: string, params: Record<string, unknown>) {
-        readCount++;
+      async runRead(cypher: string) {
         if (cypher.includes('lastEnrichedHash')) return [hash];
         return [];
       },
@@ -320,7 +318,7 @@ describe('DocGraphReconciler', () => {
   it('updates Related Code section when updateRelatedCodeSections=true and refs resolved', async () => {
     // Stub graph that returns a Symbol match for exact resolution.
     const graph: GraphClient = {
-      async runRead(cypher: string, params: Record<string, unknown>) {
+      async runRead(cypher: string) {
         if (cypher.includes('lastEnrichedHash')) return [null];
         if (cypher.includes('s.repo') && cypher.includes('s.filePath') && cypher.includes('s.name')) {
           // Return a matching symbol.
