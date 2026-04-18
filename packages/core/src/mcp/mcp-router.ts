@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+
+import { AuthStore } from './auth-store.js';
 import { TOOL_HANDLERS } from './handlers/index.js';
 import { isServiceUnavailable } from './handlers/service-status.js';
 import type { HandlerContext, McpToolResponse } from './types.js';
@@ -17,25 +20,49 @@ export interface McpResponse {
   httpStatus?: number;
 }
 
-export class McpRouter {
-  constructor(private readonly ctx: HandlerContext) {}
+export interface RequestMeta {
+  traceId?: string;
+  /** Granted scopes for the caller. Undefined means auth is disabled — all tools allowed. */
+  scopes?: string[];
+}
 
-  async handleToolCall(toolName: string, params: Record<string, unknown>): Promise<McpToolResponse> {
+export class McpRouter {
+  constructor(private readonly ctx: Omit<HandlerContext, 'traceId'>) {}
+
+  async handleToolCall(
+    toolName: string,
+    params: Record<string, unknown>,
+    meta: RequestMeta = {},
+  ): Promise<McpToolResponse> {
     const handler = TOOL_HANDLERS[toolName];
     if (!handler) {
       return errorResponse(`Unknown tool: "${toolName}".`);
     }
 
+    // Scope enforcement when auth is active (scopes array present).
+    if (meta.scopes !== undefined) {
+      const required = AuthStore.requiredScopeFor(toolName);
+      if (required && !AuthStore.hasScope(meta.scopes, required)) {
+        return {
+          content: [{ type: 'text', text: `Forbidden: tool "${toolName}" requires scope "${required}".` }],
+          isError: true,
+        };
+      }
+    }
+
+    const traceId = meta.traceId ?? randomUUID();
+    const requestCtx: HandlerContext = { ...this.ctx, traceId } as HandlerContext;
+
     try {
-      return await handler(params, this.ctx);
+      return await handler(params, requestCtx);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.ctx.logger.error('tool handler error', { tool: toolName, error: message });
+      this.ctx.logger.error('tool handler error', { tool: toolName, traceId, error: message });
       return errorResponse(`Internal error in ${toolName}: ${message}`);
     }
   }
 
-  async handleRequest(request: McpRequest): Promise<McpResponse> {
+  async handleRequest(request: McpRequest, meta: RequestMeta = {}): Promise<McpResponse> {
     if (request.method === 'tools/call') {
       const toolName = request.params['name'] as string | undefined;
       const toolParams = (request.params['arguments'] as Record<string, unknown>) ?? {};
@@ -44,7 +71,7 @@ export class McpRouter {
         return { id: request.id, error: { code: -32_602, message: 'Missing tool name' } };
       }
 
-      const result = await this.handleToolCall(toolName, toolParams);
+      const result = await this.handleToolCall(toolName, toolParams, meta);
       if (isServiceUnavailable(result)) {
         return { id: request.id, result, httpStatus: 503 };
       }

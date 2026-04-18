@@ -26,7 +26,7 @@ export interface GitRepoWatcherDeps {
 
 export class GitRepoWatcher {
   private readonly config: SourceAccessConfig;
-  private readonly repos: RepoEntry[];
+  private readonly repoList: RepoEntry[];
   private readonly log: Logger;
   private readonly listeners = new Set<RepoUpdateListener>();
   private readonly inFlight = new Map<string, Promise<void>>();
@@ -35,7 +35,7 @@ export class GitRepoWatcher {
 
   constructor(deps: GitRepoWatcherDeps) {
     this.config = deps.config;
-    this.repos = deps.repos.repos;
+    this.repoList = deps.repos.repos;
     this.log = deps.logger ?? createLogger('git-repo-watcher');
   }
 
@@ -48,7 +48,7 @@ export class GitRepoWatcher {
     this.log.info('starting', {
       cloneRoot: this.config.cloneRoot,
       fetchIntervalSeconds: this.config.fetchIntervalSeconds,
-      repos: this.repos.length,
+      repos: this.repoList.length,
     });
 
     await this.syncAll();
@@ -68,6 +68,10 @@ export class GitRepoWatcher {
     this.started = false;
   }
 
+  repos(): RepoEntry[] {
+    return [...this.repoList];
+  }
+
   onRepoUpdated(listener: RepoUpdateListener): () => void {
     this.listeners.add(listener);
     return () => {
@@ -76,7 +80,7 @@ export class GitRepoWatcher {
   }
 
   private async syncAll(): Promise<void> {
-    await Promise.all(this.repos.map((repo) => this.runOnce(repo)));
+    await Promise.all(this.repoList.map((repo) => this.runOnce(repo)));
   }
 
   private runOnce(repo: RepoEntry): Promise<void> {

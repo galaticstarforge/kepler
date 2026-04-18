@@ -87,6 +87,38 @@ export interface BaseExtractorConfig {
   maxFileSizeBytes: number;
 }
 
+export interface AuthTokenConfig {
+  /** Human-readable name used in logs and rate-limit keys. */
+  name: string;
+  /** Raw bearer token value. */
+  token: string;
+  /**
+   * Granted scopes. Valid values: `docs:read`, `docs:write`, `graph:read`,
+   * `graph:write`, `admin:*`. An empty array grants no tool access.
+   */
+  scopes: string[];
+}
+
+export interface AuthConfig {
+  /** When false the auth layer is bypassed entirely (useful for local dev). */
+  enabled: boolean;
+  tokens: AuthTokenConfig[];
+}
+
+export interface RateLimitDefaults {
+  requestsPerMinute: number;
+  requestsPerHour: number;
+}
+
+export interface PerTokenRateLimit extends RateLimitDefaults {
+  name: string;
+}
+
+export interface RateLimitsConfig {
+  defaults: RateLimitDefaults;
+  perToken: PerTokenRateLimit[];
+}
+
 export interface CoreConfig {
   system: {
     name: string;
@@ -100,6 +132,8 @@ export interface CoreConfig {
   mcp: {
     port: number;
   };
+  auth: AuthConfig;
+  rateLimits: RateLimitsConfig;
   observability: {
     logLevel: 'debug' | 'info' | 'warn' | 'error';
   };
@@ -118,6 +152,11 @@ const DEFAULT_CONFIG: CoreConfig = {
     graph: { bolt: 'bolt://localhost:7687' },
   },
   mcp: { port: 8080 },
+  auth: { enabled: false, tokens: [] },
+  rateLimits: {
+    defaults: { requestsPerMinute: 60, requestsPerHour: 500 },
+    perToken: [],
+  },
   observability: { logLevel: 'info' },
   enrichment: {
     conceptExtraction: {
@@ -212,10 +251,32 @@ function mergeSummarization(
   };
 }
 
+function mergeAuth(defaults: AuthConfig, raw: Partial<AuthConfig> | undefined): AuthConfig {
+  if (!raw) return { ...defaults, tokens: [...defaults.tokens] };
+  const tokens = Array.isArray(raw.tokens) ? (raw.tokens as AuthTokenConfig[]) : defaults.tokens;
+  return { enabled: raw.enabled ?? defaults.enabled, tokens };
+}
+
+function mergeRateLimits(
+  defaults: RateLimitsConfig,
+  raw: Partial<RateLimitsConfig> | undefined,
+): RateLimitsConfig {
+  if (!raw) return { ...defaults, perToken: [...defaults.perToken] };
+  const perToken = Array.isArray(raw.perToken)
+    ? (raw.perToken as PerTokenRateLimit[])
+    : defaults.perToken;
+  return {
+    defaults: { ...defaults.defaults, ...(raw.defaults as Partial<RateLimitDefaults> | undefined) },
+    perToken,
+  };
+}
+
 function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreConfig {
   const system = raw['system'] as Partial<CoreConfig['system']> | undefined;
   const storage = raw['storage'] as Record<string, unknown> | undefined;
   const mcp = raw['mcp'] as Partial<CoreConfig['mcp']> | undefined;
+  const auth = raw['auth'] as Partial<AuthConfig> | undefined;
+  const rateLimits = raw['rateLimits'] as Partial<RateLimitsConfig> | undefined;
   const observability = raw['observability'] as Partial<CoreConfig['observability']> | undefined;
   const enrichment = raw['enrichment'] as Record<string, unknown> | undefined;
   const summarization = raw['summarization'] as Partial<SummarizationConfig> | undefined;
@@ -240,6 +301,8 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
       },
     },
     mcp: { ...defaults.mcp, ...mcp },
+    auth: mergeAuth(defaults.auth, auth),
+    rateLimits: mergeRateLimits(defaults.rateLimits, rateLimits),
     observability: { ...defaults.observability, ...observability },
     enrichment: {
       conceptExtraction: {
