@@ -1,7 +1,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package.json ./
-RUN sed -i '/@kepler\/shared/d' package.json && npm install --omit=dev
+RUN sed -i '/@keplerforge\/shared/d' package.json && npm install --omit=dev
 COPY dist/ ./dist/
 
 FROM node:20-alpine
