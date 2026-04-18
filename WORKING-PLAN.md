@@ -425,6 +425,30 @@ governs, and semantic-summary passes.
 - `admin.passRunHistory` MCP tool (added in Phase E) can list the last
   N runs per repo.
 
+### Phase A2 — Schema version ratchet
+
+**Why here:** §6b.2. Migration doc requires a one-way ratchet. Later
+phases add indexes, node types, and edge labels; without a ratchet,
+downgrades or mixed versions can silently corrupt the graph.
+
+**Scope**
+- Introduce `_KeplerMeta {id:'singleton', schemaVersion: int,
+  updatedAt: datetime}` singleton node.
+- `graph.applySchema` bumped to run numbered migrations from
+  `packages/core/src/graph/migrations/<nnn>-*.ts`. Each migration
+  exports `version`, `description`, `up(graph)`. Running older
+  schema against newer code aborts startup with a typed error.
+- CLI: `kepler upgrade` (Phase I) refuses to proceed if the live
+  runtime's `schemaVersion` exceeds the CLI's bundled version
+  (reverse-incompatibility check).
+- Core-index statements become migration `001-core-indexes`.
+
+**Acceptance**
+- Starting core against a DB whose schemaVersion exceeds the
+  runtime version exits with `KPL_E_SCHEMA_DOWNGRADE` (see Phase I
+  error catalogue).
+- Re-running the migrator is idempotent.
+
 ### Phase B — Structural metrics layer (GDS)
 
 **Why next:** `docs/migration.md` explicitly orders structural first.
@@ -717,6 +741,44 @@ server half of plugin upload/restart.
 - Every documented error in `docs/cli/commands.md` maps to a
   `KPL_E_*` code printed alongside the hint.
 
+### Phase K — Runtime deployment bootstrap (emergency)
+
+**Why:** §6b.1 above. A fresh `kepler deploy` currently produces a
+container that exits on startup. This should be prioritised alongside
+Phase A (or ahead of it) because every other phase assumes a running
+runtime.
+
+**Scope**
+- Extend `kepler-instance.ts` user-data compose file to include a
+  `neo4j` service sharing a `kepler-net` network with `core`.
+  Pin to `neo4j:5.x-community` with GDS plugin (env
+  `NEO4J_PLUGINS='["graph-data-science"]'`). Persist `neo4j-data`,
+  `neo4j-logs` to an EBS-backed volume.
+- Neo4j admin password: generated on deploy, stored in Secrets
+  Manager, mounted into the compose env as a Docker secret.
+- Config/repos sync mechanism:
+  - `deployments/<name>/runtime/config.yaml` and
+    `deployments/<name>/runtime/repos.yaml` live in the state bucket.
+  - A `kepler-config-sync` sidecar (or systemd timer) pulls both
+    into `/etc/project/` before `core` starts. Alternatively,
+    bake an init-container that uses `aws s3 cp`.
+- SSH deploy-key material mounted read-only (path from config) via
+  Secrets Manager + SSM parameter store.
+- GHCR image reference: parameterise the org
+  (`${github.repository_owner}` in user-data too) rather than
+  hardcoding `vleader`.
+- Add `CoreVersion` CloudFormation output so `kepler upgrade` and
+  `kepler status` can compare CLI vs deployed runtime.
+- Add a smoke test in `packages/installer/test/` that asserts the
+  compose file includes `neo4j` and sets `KEPLER_CONFIG_PATH`.
+
+**Acceptance**
+- `kepler deploy` produces an instance where
+  `docker compose ps` shows both `core` and `neo4j` running.
+- Core `/ready` returns 200 within 2 minutes of instance first boot.
+- `kepler status` shows `CoreVersion` matching the CLI minor
+  version.
+
 ### Phase J — Plugin loader + SourceAccess + remaining primitives
 
 **Why last:** "Zero plugins, still useful" principle means core is
@@ -756,19 +818,87 @@ is needed for deterministic source reads.
 
 | Track | Depends on | Runs in parallel with |
 |---|---|---|
-| A (pass runner) | — | — |
-| B (structural metrics) | A | H, I |
-| C (behavioral completion) | A, B (schema only) | H, I |
-| D (semantic schema + vectors) | B, C | E (tool stubs), H, I |
-| E (MCP expansion + auth) | D for semanticSearch; C for graph.*) | H, I |
+| **K (runtime bootstrap)** | — | everything (**prioritise**) |
+| A (pass runner) | K | I, H |
+| A2 (schema ratchet) | A | B–J |
+| B (structural metrics) | A, A2 | H, I |
+| C (behavioral completion) | A, A2 (schema only) | H, I |
+| D (semantic schema + vectors) | B, C, A2 | E (tool stubs), H, I |
+| E (MCP expansion + auth) | D for semanticSearch; C for graph.* | H, I |
 | F (summarization agent) | A–E | G, H, I |
 | G (doc↔graph cron) | C (for symbol index) | F, H, I |
 | H (observability, security) | A | B–G, I |
-| I (CLI completion) | — | B–H |
+| I (CLI completion) | K (for CoreVersion output) | B–H |
 | J (plugins + SourceAccess + remaining primitives) | A, C | — |
 
-The critical path is A → B → C → D → F. Everything else can move
-alongside.
+The critical path is **K → A → A2 → B → C → D → F.** Everything else
+can move alongside.
+
+Phase K first: every other phase assumes a functioning runtime on a
+fresh deploy. Without K, none of B–J can be validated end-to-end.
+
+---
+
+## 6b. Additional gaps surfaced in review
+
+These turned up during a second pass and were not captured in the
+inventory above.
+
+### 6b.1 Runtime deployment is non-functional today
+
+`packages/installer/src/stacks/constructs/kepler-instance.ts` builds
+user-data that runs **only** the `core` container. Concretely:
+
+- No Neo4j sidecar. `index.ts` calls `graph.connect()` and
+  `process.exit(1)` on failure — a fresh deploy crashes immediately.
+- No config file delivery. Core reads
+  `/etc/project/config.yaml` (or `$KEPLER_CONFIG_PATH`), but
+  user-data never writes one. The container falls back to
+  `DEFAULT_CONFIG` (filesystem doc store, bolt to `localhost:7687`,
+  no KB).
+- No `repos.yaml` delivery. Indexer cannot activate.
+- No SSH deploy-key material mounted; `sourceAccess.sshKeyPath` has
+  nothing to point at.
+- GHCR image org is hardcoded to `vleader` in user-data but the
+  release workflow publishes under `${github.repository_owner}` —
+  they will disagree in any fork.
+
+### 6b.2 Schema migration / version ratchet
+
+`docs/cli/versioning.md` mandates a one-way schema ratchet, but
+nothing in code implements a `schemaVersion` property on a
+`_KeplerMeta` node, nor a migrator. `graph.applySchema` only runs
+idempotent `CREATE INDEX IF NOT EXISTS` statements.
+
+### 6b.3 Monorepo release path exists
+
+`.github/workflows/release.yml` + `.changeset/` show a working
+changesets-based release flow to npm + a GHCR image build keyed on
+`packages/core/package.json`.`version`. This is important input for
+Phase I (CLI `upgrade`) because the CLI needs a stable way to
+resolve "latest". The pipeline is already there; the CLI just
+needs to read from npm.
+
+### 6b.4 CI baseline already exists
+
+`.github/workflows/ci.yml` runs `pnpm lint/build/typecheck/test`
+on Node 20 and 22 plus Docker build + CDK synth validation. Every
+phase below should add tests under `packages/{core,cli,installer}/
+test/` to that matrix (the harness is Vitest; existing tests
+under `packages/core/test/indexer/` are good patterns to copy).
+
+### 6b.5 "info" vs "version" is already leaking into docs
+
+`docs/getting-started.md` uses `kepler info` whereas
+`docs/cli/commands.md` uses `kepler version`. The command in code
+is `info`. Decide one canonical name before Phase I renames things.
+
+### 6b.6 Local dev Neo4j
+
+`infra/docker-compose.yml` runs only Neo4j with `NEO4J_AUTH: none`
+and no GDS plugin. Phase B's GDS requirement means this file also
+needs to gain the GDS plugin (env var `NEO4J_PLUGINS='["graph-data-
+science"]'` or a custom image). Flag this alongside Phase B.
 
 ---
 
@@ -801,9 +931,17 @@ alongside.
 
 ## 8. Next actions
 
-1. Ship Phase A (pass runner + passRunHistory) as a single PR. This
-   unblocks every graph-enrichment phase.
-2. Open a spike ticket for GDS packaging + OpenSearch provisioning —
-   these are blocking environmental questions.
-3. Start Phase I work in parallel with Phase A since it does not
-   touch the graph.
+1. **Ship Phase K first.** Runtime is broken on a fresh deploy —
+   Neo4j sidecar, config/repos sync, GHCR org parameterisation.
+   Everything else is untestable end-to-end until this is fixed.
+2. In parallel, ship Phase A (pass runner + `passRunHistory`) as a
+   small PR — this unblocks all graph-enrichment phases.
+3. Open spike tickets for: GDS plugin packaging in the Neo4j image,
+   OpenSearch Serverless collection provisioning for Bedrock KB,
+   runtime-to-state-bucket config sync mechanism (init container vs
+   systemd timer).
+4. Start Phase I in parallel — CLI flag gaps and `KPL_E_*` codes
+   are independent of the runtime.
+5. Once Phase A is in, Phase A2 (schema ratchet) is a very small
+   follow-up and should go before any migration-worthy schema
+   change lands in B/C/D.
