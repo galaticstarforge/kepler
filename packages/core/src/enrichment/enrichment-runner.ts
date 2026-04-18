@@ -7,8 +7,8 @@ import type {
   EnrichmentRunRecord,
   EnrichmentRunStats,
   ExtractionCandidate,
-} from '@kepler/shared';
-import { CONCEPTS_PREFIX, EnrichmentError } from '@kepler/shared';
+} from '@keplerforge/shared';
+import { CONCEPTS_PREFIX, EnrichmentError } from '@keplerforge/shared';
 
 import type { ConceptExtractionConfig } from '../config.js';
 import type { GraphClient } from '../graph/graph-client.js';

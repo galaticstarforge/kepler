@@ -3,9 +3,9 @@
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [],
-  "linked": [["@kepler/cli", "@kepler/installer", "@kepler/core", "@kepler/plugin-sdk"]],
+  "linked": [["@keplerforge/cli", "@keplerforge/installer", "@keplerforge/core", "@keplerforge/plugin-sdk"]],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@kepler/shared"]
+  "ignore": ["@keplerforge/shared"]
 }

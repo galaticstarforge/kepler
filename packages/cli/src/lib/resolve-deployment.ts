@@ -1,4 +1,4 @@
-import { getStatus } from '@kepler/installer';
+import { getStatus } from '@keplerforge/installer';
 
 import { readLocalState } from './config.js';
 import { NotInitializedError } from './errors.js';

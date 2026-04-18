@@ -7,5 +7,5 @@ export default defineConfig({
   clean: true,
   splitting: false,
   external: ['aws-cdk-lib', 'constructs', '@aws-sdk/client-cloudformation', 'execa'],
-  noExternal: ['@kepler/shared'],
+  noExternal: ['@keplerforge/shared'],
 });

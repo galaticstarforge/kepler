@@ -1,4 +1,4 @@
-import type { DocumentStore, SemanticIndex } from '@kepler/shared';
+import type { DocumentStore, SemanticIndex } from '@keplerforge/shared';
 
 import type { TemplateManager } from '../docs/template-manager.js';
 import type { ConceptStore } from '../enrichment/concept-store.js';

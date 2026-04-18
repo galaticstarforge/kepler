@@ -2,15 +2,15 @@
 
 ## Package
 
-The CLI is published to the npm registry as `@kepler/cli`. Installation:
+The CLI is published to the npm registry as `@keplerforge/cli`. Installation:
 
 ```bash
-npm install -g @kepler/cli
+npm install -g @keplerforge/cli
 ```
 
-The package is scoped (`@kepler/*`) and public. Publishing uses npm provenance to prove builds originated from the project's GitHub Actions workflow.
+The package is scoped (`@keplerforge/*`) and public. Publishing uses npm provenance to prove builds originated from the project's GitHub Actions workflow.
 
-The CLI is one of several packages in the Kepler monorepo but publishes independently. The other packages (`@kepler/core` the runtime, `@kepler/installer` the CDK stacks consumed internally, `@kepler/plugin-sdk` for plugin authors, and `@kepler/shared` internal utilities) are implementation details. Users only install the CLI.
+The CLI is one of several packages in the Kepler monorepo but publishes independently. The other packages (`@keplerforge/core` the runtime, `@keplerforge/installer` the CDK stacks consumed internally, `@keplerforge/plugin-sdk` for plugin authors, and `@keplerforge/shared` internal utilities) are implementation details. Users only install the CLI.
 
 ---
 

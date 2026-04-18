@@ -79,10 +79,10 @@ observability:
 
 # Plugins to load, in order.
 plugins:
-  - name: '@kepler/plugin-serverless'
+  - name: '@keplerforge/plugin-serverless'
     config:
       frameworkVersion: 2
-  - name: '@kepler/plugin-aurelia'
+  - name: '@keplerforge/plugin-aurelia'
 ```
 
 ---

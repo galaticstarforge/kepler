@@ -1,7 +1,7 @@
 /**
  * LLM client interface used by the enrichment pipeline.
  *
- * Kept internal to @kepler/core — not re-exported from @kepler/shared to
+ * Kept internal to @keplerforge/core — not re-exported from @keplerforge/shared to
  * avoid pulling provider SDK types into the public surface.
  */
 

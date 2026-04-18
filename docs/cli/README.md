@@ -1,4 +1,4 @@
-# CLI (`@kepler/cli`)
+# CLI (`@keplerforge/cli`)
 
 **Status:** Draft v1
 **Scope:** The `kepler` command-line interface

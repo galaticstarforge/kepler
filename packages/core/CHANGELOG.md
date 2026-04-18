@@ -1,4 +1,4 @@
-# @kepler/core
+# @keplerforge/core
 
 ## 1.0.0
 

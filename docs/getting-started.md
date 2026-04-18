@@ -64,7 +64,7 @@ kepler iam-policy --create
 
 ### 1. Install the CLI
 ```bash
-npm install -g @kepler/cli
+npm install -g @keplerforge/cli
 ```
 
 ### 2. Initialize
@@ -100,7 +100,7 @@ curl http://localhost:8080/health
 A second user on a different machine can connect to an existing deployment:
 
 ```bash
-npm install -g @kepler/cli
+npm install -g @keplerforge/cli
 kepler discover    # finds the existing state bucket
 kepler tunnel      # connects to the deployment
 ```

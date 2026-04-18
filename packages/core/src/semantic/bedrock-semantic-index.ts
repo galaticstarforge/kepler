@@ -7,8 +7,8 @@ import type {
   SearchOptions,
   SearchResult,
   SemanticIndex,
-} from '@kepler/shared';
-import { CONCEPTS_PREFIX, SemanticIndexError } from '@kepler/shared';
+} from '@keplerforge/shared';
+import { CONCEPTS_PREFIX, SemanticIndexError } from '@keplerforge/shared';
 
 import { getBedrockAgentClient, getBedrockAgentRuntimeClient } from '../aws-clients.js';
 import { createLogger } from '../logger.js';

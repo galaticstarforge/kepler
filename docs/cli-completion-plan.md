@@ -41,8 +41,8 @@ The CLI MVP is structurally complete: all 11 commands are wired up, build toolin
 
 ### 1.5 Hardcoded version `'0.0.1'` in deploy command
 **File:** `packages/cli/src/commands/deploy.ts` line 86 (`keplerVersion: '0.0.1'`)  
-**Problem:** Should read from `@kepler/shared` constants or `package.json` so version bumps propagate automatically.  
-**Fix:** Import `KEPLER_VERSION` from `@kepler/shared/constants` (already exported).
+**Problem:** Should read from `@keplerforge/shared` constants or `package.json` so version bumps propagate automatically.  
+**Fix:** Import `KEPLER_VERSION` from `@keplerforge/shared/constants` (already exported).
 
 ---
 
@@ -89,8 +89,8 @@ The CLI MVP is structurally complete: all 11 commands are wired up, build toolin
 
 ### 3.2 Type duplication between shared and installer
 **Files:** `packages/shared/src/types.ts` vs `packages/installer/src/types.ts`  
-**Problem:** Both define `DeploymentConfig` and `DeploymentOutputs` with slightly different fields. The CLI imports from `@kepler/installer` while the shared types go unused.  
-**Fix:** Have `@kepler/installer` re-export types from `@kepler/shared`, or consolidate so there's one source of truth.
+**Problem:** Both define `DeploymentConfig` and `DeploymentOutputs` with slightly different fields. The CLI imports from `@keplerforge/installer` while the shared types go unused.  
+**Fix:** Have `@keplerforge/installer` re-export types from `@keplerforge/shared`, or consolidate so there's one source of truth.
 
 ---
 

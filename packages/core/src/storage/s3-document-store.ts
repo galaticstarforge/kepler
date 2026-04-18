@@ -13,8 +13,8 @@ import type {
   DocumentStore,
   DocumentStoreEvent,
   DocumentStoreEventType,
-} from '@kepler/shared';
-import { DocumentStoreError } from '@kepler/shared';
+} from '@keplerforge/shared';
+import { DocumentStoreError } from '@keplerforge/shared';
 
 import { getS3Client, getSQSClient } from '../aws-clients.js';
 import { createLogger } from '../logger.js';

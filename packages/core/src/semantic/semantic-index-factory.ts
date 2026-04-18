@@ -1,4 +1,4 @@
-import type { SemanticIndex } from '@kepler/shared';
+import type { SemanticIndex } from '@keplerforge/shared';
 
 import type { SemanticIndexConfig } from '../config.js';
 

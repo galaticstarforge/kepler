@@ -1,4 +1,4 @@
-import { readFile, writeFile, unlink, mkdir, stat, readdir } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink, mkdir, stat, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 import type {
@@ -7,7 +7,7 @@ import type {
   DocumentMetadata,
   DocumentStore,
   DocumentStoreEvent,
-} from '@kepler/shared';
+} from '@keplerforge/shared';
 import { watch as chokidarWatch } from 'chokidar';
 
 
@@ -80,7 +80,9 @@ export class FilesystemDocumentStore implements DocumentStore {
   async put(docPath: string, content: Buffer, metadata: DocumentMetadata): Promise<void> {
     const fullPath = this.resolve(docPath);
     await mkdir(path.dirname(fullPath), { recursive: true });
-    await writeFile(fullPath, content);
+    const tmpPath = `${fullPath}.tmp`;
+    await writeFile(tmpPath, content);
+    await rename(tmpPath, fullPath);
     await writeSidecar(fullPath, {
       contentType: metadata.contentType,
       etag: metadata.etag,

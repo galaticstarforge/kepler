@@ -1,4 +1,4 @@
-# @kepler/plugin-sdk
+# @keplerforge/plugin-sdk
 
 ## 1.0.0
 

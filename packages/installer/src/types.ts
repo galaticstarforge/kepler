@@ -1,1 +1,1 @@
-export type { DeploymentConfig, DeploymentOutputs } from '@kepler/shared';
+export type { DeploymentConfig, DeploymentOutputs } from '@keplerforge/shared';

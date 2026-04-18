@@ -7,12 +7,12 @@ import type {
   ReferenceChannel,
   SymbolReference,
   UnresolvedReference,
-} from '@kepler/shared';
+} from '@keplerforge/shared';
 import {
   CONCEPTS_PREFIX,
   DOC_GRAPH_INIT_KEY,
   DOC_GRAPH_RUNS_PREFIX,
-} from '@kepler/shared';
+} from '@keplerforge/shared';
 
 import type { DocGraphCronConfig } from '../config.js';
 import { parseFrontmatter } from '../docs/frontmatter-parser.js';

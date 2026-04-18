@@ -1,5 +1,5 @@
 import { DescribeInstanceInformationCommand } from '@aws-sdk/client-ssm';
-import { getStatus } from '@kepler/installer';
+import { getStatus } from '@keplerforge/installer';
 import { Command } from 'commander';
 
 import { getSSMClient } from '../lib/aws-clients.js';

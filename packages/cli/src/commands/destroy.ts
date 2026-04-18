@@ -2,7 +2,7 @@ import {
   ListObjectVersionsCommand,
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
-import { getStatus, destroy } from '@kepler/installer';
+import { getStatus, destroy } from '@keplerforge/installer';
 import { Command } from 'commander';
 import ora from 'ora';
 

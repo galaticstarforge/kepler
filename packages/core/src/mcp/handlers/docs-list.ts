@@ -1,5 +1,5 @@
-import type { DocumentHead } from '@kepler/shared';
-import { CONCEPTS_PREFIX } from '@kepler/shared';
+import type { DocumentHead } from '@keplerforge/shared';
+import { CONCEPTS_PREFIX } from '@keplerforge/shared';
 
 import type { HandlerContext, McpToolResponse } from '../types.js';
 import { structuredResponse } from '../types.js';

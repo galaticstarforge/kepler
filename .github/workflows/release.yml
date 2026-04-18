@@ -28,7 +28,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @kepler/core... build
+      - run: pnpm --filter @keplerforge/shared build
+      - run: pnpm --filter @keplerforge/core build
 
       - name: Get core version
         id: version

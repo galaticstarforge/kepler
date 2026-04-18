@@ -1,4 +1,4 @@
-import type { ExtractionCandidate } from '@kepler/shared';
+import type { ExtractionCandidate } from '@keplerforge/shared';
 
 import { parseFrontmatter } from '../docs/frontmatter-parser.js';
 import { stripMarkdown } from '../docs/markdown-stripper.js';

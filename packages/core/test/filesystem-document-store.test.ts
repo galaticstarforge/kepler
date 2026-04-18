@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { DocumentMetadata } from '@kepler/shared';
+import type { DocumentMetadata } from '@keplerforge/shared';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 

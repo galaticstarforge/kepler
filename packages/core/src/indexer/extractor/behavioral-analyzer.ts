@@ -9,7 +9,7 @@ import type {
   ServiceProtocol,
   SymbolBehavior,
   SymbolData,
-} from '@kepler/shared';
+} from '@keplerforge/shared';
 import ts from 'typescript';
 
 // ─── SDK → service mapping ────────────────────────────────────────────────────

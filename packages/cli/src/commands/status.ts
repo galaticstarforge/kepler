@@ -1,5 +1,5 @@
 import { DescribeInstancesCommand } from '@aws-sdk/client-ec2';
-import { getStatus } from '@kepler/installer';
+import { getStatus } from '@keplerforge/installer';
 import { Command } from 'commander';
 
 import { getEC2Client } from '../lib/aws-clients.js';

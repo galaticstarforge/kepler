@@ -1,5 +1,5 @@
 {
-  "name": "@kepler/plugin-sdk",
+  "name": "@keplerforge/plugin-sdk",
   "version": "1.0.0",
   "private": false,
   "type": "module",

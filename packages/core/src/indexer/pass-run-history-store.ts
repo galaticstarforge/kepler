@@ -1,4 +1,4 @@
-import type { DocumentStore } from '@kepler/shared';
+import type { DocumentStore } from '@keplerforge/shared';
 
 export type PassRunStatus = 'success' | 'error' | 'timeout' | 'skipped';
 

@@ -2,8 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { DocumentStore } from '@kepler/shared';
-import { TEMPLATES_PREFIX } from '@kepler/shared';
+import type { DocumentStore } from '@keplerforge/shared';
+import { TEMPLATES_PREFIX } from '@keplerforge/shared';
 
 import { createLogger } from '../logger.js';
 
