@@ -1,5 +1,6 @@
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
+import type { Pass, PassContext, PassStats } from '../pass-runner.js';
 
 export interface StructuralMetricsDeps {
   graph: GraphClient;
@@ -26,6 +27,7 @@ export interface StructuralMetricsStats {
 }
 
 const PROJECTION_PREFIX = 'kepler-calls-';
+const DEFAULT_EDGE_DELTA_THRESHOLD = 0.05;
 
 /**
  * Runs Neo4j GDS algorithms against the `CALLS` projection and writes the
@@ -35,11 +37,83 @@ const PROJECTION_PREFIX = 'kepler-calls-';
  * Requires the Neo4j Graph Data Science plugin. See
  * docs/graph/structural-metrics.md for details and the required GDS version.
  */
-export class StructuralMetricsPass {
+export class StructuralMetricsPass implements Pass {
+  readonly name = 'structural-metrics';
   private readonly log: Logger;
 
   constructor(private readonly deps: StructuralMetricsDeps) {
     this.log = deps.logger ?? createLogger('structural-metrics');
+  }
+
+  async runFor(ctx: PassContext): Promise<PassStats | void> {
+    const { repo, config: rawConfig } = ctx;
+    const cfg = (rawConfig ?? {}) as {
+      edgeDeltaThreshold?: number;
+      pageRank?: { maxIterations?: number; dampingFactor?: number };
+      betweenness?: { samplingSize?: number };
+      leiden?: { gamma?: number; theta?: number; maxLevels?: number };
+    };
+
+    const threshold = cfg.edgeDeltaThreshold ?? DEFAULT_EDGE_DELTA_THRESHOLD;
+    const currentEdgeCount = await this.readEdgeCount(repo);
+    const lastEdgeCount = await this.readLastEdgeCount(repo);
+
+    if (lastEdgeCount !== null) {
+      const delta = Math.abs(currentEdgeCount - lastEdgeCount) / Math.max(lastEdgeCount, 1);
+      if (delta < threshold) {
+        ctx.logger.info('structural metrics skipped: edge delta below threshold', {
+          repo,
+          currentEdgeCount,
+          lastEdgeCount,
+          delta: delta.toFixed(4),
+          threshold,
+        });
+        return { skipped: true, reason: 'edge-delta-below-threshold', currentEdgeCount, lastEdgeCount };
+      }
+    }
+
+    const passConfig: StructuralMetricsConfig = {
+      repo,
+      ...(cfg.pageRank ? { pageRank: { maxIterations: 20, dampingFactor: 0.85, ...cfg.pageRank } } : {}),
+      ...(cfg.betweenness ? { betweenness: { samplingSize: 5000, ...cfg.betweenness } } : {}),
+      ...(cfg.leiden ? { leiden: { gamma: 1, theta: 0.01, maxLevels: 10, ...cfg.leiden } } : {}),
+    };
+
+    const stats = await this.run(passConfig);
+    await this.persistEdgeCount(repo, currentEdgeCount);
+    return stats as unknown as PassStats;
+  }
+
+  private async readEdgeCount(repo: string): Promise<number> {
+    const rows = await this.deps.graph.runRead(
+      `MATCH (a:Symbol {repo: $repo})-[r:CALLS]->(b:Symbol {repo: $repo})
+       RETURN count(r) AS n`,
+      { repo },
+      (r) => Number(r.get('n')),
+    );
+    return rows[0] ?? 0;
+  }
+
+  private async readLastEdgeCount(repo: string): Promise<number | null> {
+    const rows = await this.deps.graph.runRead(
+      `MATCH (m:_StructuralMetricsMeta {repo: $repo})
+       RETURN m.lastEdgeCount AS n`,
+      { repo },
+      (r) => {
+        const v = r.get('n');
+        return v == null ? null : Number(v);
+      },
+    );
+    const val = rows[0];
+    return val === undefined ? null : val;
+  }
+
+  private async persistEdgeCount(repo: string, count: number): Promise<void> {
+    await this.deps.graph.runWrite(
+      `MERGE (m:_StructuralMetricsMeta {repo: $repo})
+       SET m.lastEdgeCount = $count, m.updatedAt = datetime()`,
+      { repo, count },
+    );
   }
 
   async run(config: StructuralMetricsConfig): Promise<StructuralMetricsStats> {

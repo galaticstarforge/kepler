@@ -11,6 +11,7 @@ import { createLlmClient } from './enrichment/llm/llm-factory.js';
 import { createGraphClient } from './graph/graph-client-factory.js';
 import { CORE_INDEX_STATEMENTS } from './graph/schema.js';
 import { DocumentStorePassRunHistoryStore, Orchestrator, PassRunner } from './indexer/index.js';
+import { StructuralMetricsPass, SymbolContentHashPass } from './indexer/analysis/index.js';
 import { createLogger, setLogLevel } from './logger.js';
 import { McpRouter } from './mcp/mcp-router.js';
 import { GitRepoWatcher } from './repos/git-repo-watcher.js';
@@ -114,7 +115,10 @@ if (config.sourceAccess.enabled && config.orchestrator.enabled && repoWatcher) {
     historyStore: new DocumentStorePassRunHistoryStore(store),
     logger: createLogger('pass-runner'),
   });
-  // Phase A ships the runner itself. Individual passes are wired in phases B–F.
+  passRunner.register(new SymbolContentHashPass({ graph }), {});
+  passRunner.register(new StructuralMetricsPass({ graph }), {
+    dependsOn: ['symbol-content-hash'],
+  });
 
   orchestrator = new Orchestrator({
     watcher: repoWatcher,
