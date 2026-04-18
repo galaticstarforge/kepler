@@ -32,7 +32,7 @@ export class McpRouter {
   async handleToolCall(
     toolName: string,
     params: Record<string, unknown>,
-    meta: RequestMeta,
+    meta: RequestMeta = {},
   ): Promise<McpToolResponse> {
     const handler = TOOL_HANDLERS[toolName];
     if (!handler) {
