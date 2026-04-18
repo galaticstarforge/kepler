@@ -1,6 +1,8 @@
 import type { ToolHandler } from '../types.js';
 
 import { adminDiagnostics } from './admin-diagnostics.js';
+import { adminDocGraphRun } from './admin-doc-graph-run.js';
+import { adminDocGraphStatus } from './admin-doc-graph-status.js';
 import { adminEnrichmentRun } from './admin-enrichment-run.js';
 import { adminEnrichmentStatus } from './admin-enrichment-status.js';
 import { adminPassRunHistory } from './admin-pass-run-history.js';
@@ -65,6 +67,8 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   'graph.symbolContext': graphSymbolContext,
   'graph.communityContext': graphCommunityContext,
   // admin.*
+  'admin.docGraphRun': adminDocGraphRun,
+  'admin.docGraphStatus': adminDocGraphStatus,
   'admin.enrichmentRun': adminEnrichmentRun,
   'admin.enrichmentStatus': adminEnrichmentStatus,
   'admin.reindex': adminReindex,

@@ -1,5 +1,5 @@
 import type { SearchOptions } from '@kepler/shared';
-import { CONCEPTS_PREFIX } from '@kepler/shared';
+import { CONCEPTS_PREFIX, SCRATCHPAD_PREFIX } from '@kepler/shared';
 
 import type { HandlerContext, McpToolResponse } from '../types.js';
 import { structuredResponse, textResponse } from '../types.js';
@@ -19,9 +19,9 @@ export async function docsSearch(
   }
 
   const raw = await ctx.index.search(query, options);
-  // Defense in depth: even if the KB data source ingested concept JSON,
-  // drop concept-prefixed results from document search output.
-  const results = raw.filter((r) => !r.path.startsWith(CONCEPTS_PREFIX));
+  const results = raw.filter(
+    (r) => !r.path.startsWith(CONCEPTS_PREFIX) && !r.path.startsWith(SCRATCHPAD_PREFIX),
+  );
 
   if (results.length === 0) {
     return textResponse('No documents matched your search query.');

@@ -2,6 +2,7 @@ import type { DocumentStore, SemanticIndex } from '@kepler/shared';
 
 import type { TemplateManager } from '../docs/template-manager.js';
 import type { ConceptStore } from '../enrichment/concept-store.js';
+import type { DocGraphReconciler } from '../enrichment/doc-graph-reconciler.js';
 import type { EnrichmentRunner } from '../enrichment/enrichment-runner.js';
 import type { GraphClient } from '../graph/graph-client.js';
 import type { PassRunHistoryStore } from '../indexer/pass-run-history-store.js';
@@ -21,6 +22,7 @@ export interface HandlerContext {
   templates: TemplateManager;
   conceptStore: ConceptStore;
   enrichmentRunner: EnrichmentRunner;
+  docGraphReconciler?: DocGraphReconciler | null;
   logger: Logger;
   vectorIndexReadiness?: VectorIndexReadiness;
   passRunHistory?: PassRunHistoryStore;

@@ -18,6 +18,8 @@ export const SCRATCHPAD_PREFIX = '.claude/scratchpad/';
 export const SESSIONS_PREFIX = '.claude/sessions/';
 export const CONCEPTS_PREFIX = 'concepts/';
 export const CONCEPT_RUNS_PREFIX = 'concepts/_runs/';
+export const DOC_GRAPH_RUNS_PREFIX = 'doc-graph-runs/_runs/';
+export const DOC_GRAPH_INIT_KEY = 'doc-graph-runs/_initialized';
 
 // Document types and statuses (must match the type unions in frontmatter.ts)
 export const DOCUMENT_TYPES = [
