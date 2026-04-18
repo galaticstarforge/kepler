@@ -10,7 +10,17 @@ import { EnrichmentRunner } from './enrichment/enrichment-runner.js';
 import { createLlmClient } from './enrichment/llm/llm-factory.js';
 import { createGraphClient } from './graph/graph-client-factory.js';
 import { CORE_INDEX_STATEMENTS } from './graph/schema.js';
-import { StructuralMetricsPass, SymbolContentHashPass } from './indexer/analysis/index.js';
+import {
+  ArchitecturalLayerPass,
+  BehavioralEdgesWriter,
+  BoundedContextPass,
+  type BoundedContextDeclaration,
+  GitVolatilityPass,
+  GovernsEdgesPass,
+  PublicApiPass,
+  StructuralMetricsPass,
+  SymbolContentHashPass,
+} from './indexer/analysis/index.js';
 import { DocumentStorePassRunHistoryStore, Orchestrator, PassRunner } from './indexer/index.js';
 import { createLogger, setLogLevel } from './logger.js';
 import { McpRouter } from './mcp/mcp-router.js';
@@ -84,13 +94,14 @@ const enrichmentRunner = new EnrichmentRunner({
 
 // Git repo watcher (optional; activates when repos.yaml present and sourceAccess.enabled).
 let repoWatcher: GitRepoWatcher | null = null;
+let loadedReposConfig: ReturnType<typeof loadReposConfig> = null;
 if (config.sourceAccess.enabled) {
   try {
-    const reposConfig = loadReposConfig();
-    if (reposConfig && reposConfig.repos.length > 0) {
+    loadedReposConfig = loadReposConfig();
+    if (loadedReposConfig && loadedReposConfig.repos.length > 0) {
       repoWatcher = new GitRepoWatcher({
         config: config.sourceAccess,
-        repos: reposConfig,
+        repos: loadedReposConfig,
         logger: createLogger('git-repo-watcher'),
       });
       repoWatcher.start().catch((error) => {
@@ -100,6 +111,19 @@ if (config.sourceAccess.enabled) {
   } catch (error) {
     log.error('failed to load repos.yaml', { error: String(error) });
   }
+}
+
+function boundedContextDeclarationsFor(repo: string): BoundedContextDeclaration[] {
+  const entry = loadedReposConfig?.repos.find((r) => r.name === repo);
+  if (!entry) return [];
+  return entry.boundedContexts.map((bc, index) => ({
+    contextId: bc.id,
+    name: bc.name ?? bc.id,
+    repo,
+    description: bc.description ?? '',
+    patterns: bc.paths,
+    declarationOrder: index,
+  }));
 }
 
 // Code indexing orchestrator (optional; activates when source access and orchestrator are enabled).
@@ -117,6 +141,22 @@ if (config.sourceAccess.enabled && config.orchestrator.enabled && repoWatcher) {
   });
   passRunner.register(new SymbolContentHashPass({ graph }), {});
   passRunner.register(new StructuralMetricsPass({ graph }), {
+    dependsOn: ['symbol-content-hash'],
+  });
+  passRunner.register(new BehavioralEdgesWriter({ graph }), {
+    dependsOn: ['symbol-content-hash'],
+  });
+  passRunner.register(new GitVolatilityPass({ graph }), {});
+  passRunner.register(new PublicApiPass({ graph }), {});
+  passRunner.register(new ArchitecturalLayerPass({ graph }), {});
+  passRunner.register(
+    new BoundedContextPass({
+      graph,
+      declarationsFor: (repo) => boundedContextDeclarationsFor(repo),
+    }),
+    {},
+  );
+  passRunner.register(new GovernsEdgesPass({ graph, store }), {
     dependsOn: ['symbol-content-hash'],
   });
 

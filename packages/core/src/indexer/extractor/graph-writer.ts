@@ -133,6 +133,113 @@ export class GraphWriter {
         { repo, filePath, callSites: result.callSites },
       );
     }
+
+    // 8. Clear old Scope / Comment / Reference nodes for this file before rewriting.
+    await this.run(
+      step('delete-primitives'),
+      `MATCH (m:Module {repo: $repo, path: $filePath})-[:CONTAINS]->(p)
+       WHERE p:Scope OR p:Comment OR p:Reference
+       DETACH DELETE p`,
+      { repo, filePath },
+    );
+
+    // 9. Create Scope nodes, then wire PARENT_SCOPE edges between siblings.
+    if (result.scopes.length > 0) {
+      await this.run(
+        step('create-scopes'),
+        `MATCH (m:Module {repo: $repo, path: $filePath})
+         UNWIND $scopes AS sc
+         CREATE (s:Scope {
+           repo:      sc.repo,
+           filePath:  sc.filePath,
+           scopeId:   sc.id,
+           kind:      sc.kind,
+           lineStart: sc.lineStart,
+           lineEnd:   sc.lineEnd,
+           isStrict:  sc.isStrict
+         })
+         MERGE (m)-[:CONTAINS]->(s)`,
+        { repo, filePath, scopes: result.scopes },
+      );
+
+      const parentEdges = result.scopes
+        .filter((s) => s.parentId !== null)
+        .map((s) => ({ childId: s.id, parentId: s.parentId as string }));
+      if (parentEdges.length > 0) {
+        await this.run(
+          step('scope-parent-edges'),
+          `UNWIND $edges AS e
+           MATCH (child:Scope  {repo: $repo, filePath: $filePath, scopeId: e.childId})
+           MATCH (parent:Scope {repo: $repo, filePath: $filePath, scopeId: e.parentId})
+           MERGE (child)-[:PARENT_SCOPE]->(parent)`,
+          { repo, filePath, edges: parentEdges },
+        );
+      }
+    }
+
+    // 10. Create Comment nodes.
+    if (result.comments.length > 0) {
+      await this.run(
+        step('create-comments'),
+        `MATCH (m:Module {repo: $repo, path: $filePath})
+         UNWIND $comments AS c
+         CREATE (cm:Comment {
+           repo:        c.repo,
+           filePath:    c.filePath,
+           kind:        c.kind,
+           text:        c.text,
+           lineStart:   c.lineStart,
+           lineEnd:     c.lineEnd,
+           hasDocTags:  c.hasDocTags
+         })
+         MERGE (m)-[:CONTAINS]->(cm)`,
+        { repo, filePath, comments: result.comments },
+      );
+
+      // Attach block/jsdoc comments to the symbol that begins immediately after them.
+      await this.run(
+        step('annotate-symbols'),
+        `MATCH (m:Module {repo: $repo, path: $filePath})-[:CONTAINS]->(cm:Comment)
+         WHERE cm.kind IN ['jsdoc', 'block']
+         MATCH (m)-[:CONTAINS]->(sym:Symbol)
+         WHERE sym.lineStart = cm.lineEnd + 1
+            OR sym.lineStart = cm.lineEnd
+         MERGE (sym)-[:ANNOTATED_BY]->(cm)`,
+        { repo, filePath },
+      );
+    }
+
+    // 11. Create Reference nodes.
+    if (result.references.length > 0) {
+      await this.run(
+        step('create-references'),
+        `MATCH (m:Module {repo: $repo, path: $filePath})
+         UNWIND $refs AS r
+         CREATE (ref:Reference {
+           repo:         r.repo,
+           filePath:     r.filePath,
+           name:         r.name,
+           bindingKind:  r.bindingKind,
+           isRead:       r.isRead,
+           isWrite:      r.isWrite,
+           isCall:       r.isCall,
+           line:         r.line,
+           column:       r.column,
+           confidence:   r.confidence
+         })
+         MERGE (m)-[:CONTAINS]->(ref)`,
+        { repo, filePath, refs: result.references },
+      );
+
+      // Best-effort RESOLVES_TO edge: match references by name to symbols declared in the same file.
+      await this.run(
+        step('references-resolve-to'),
+        `MATCH (m:Module {repo: $repo, path: $filePath})-[:CONTAINS]->(ref:Reference)
+         MATCH (sym:Symbol {repo: $repo, filePath: $filePath, name: ref.name})
+         MERGE (ref)-[:RESOLVES_TO]->(sym)`,
+        { repo, filePath },
+      );
+    }
   }
 
   async writeBehavioral(repo: string, filePath: string, result: BehavioralResult): Promise<void> {

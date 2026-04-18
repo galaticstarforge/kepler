@@ -61,6 +61,48 @@ export interface CallSiteData {
   filePath: string;
 }
 
+export type ScopeNodeKind = 'module' | 'function' | 'block' | 'iife' | 'catch' | 'with';
+
+export interface ScopeData {
+  repo: string;
+  filePath: string;
+  kind: ScopeNodeKind;
+  lineStart: number;
+  lineEnd: number;
+  isStrict: boolean;
+  /** Stable identifier within the file — used to attach children. */
+  id: string;
+  parentId: string | null;
+}
+
+export type CommentKind = 'line' | 'block' | 'jsdoc' | 'license' | 'shebang';
+
+export interface CommentData {
+  repo: string;
+  filePath: string;
+  kind: CommentKind;
+  text: string;
+  lineStart: number;
+  lineEnd: number;
+  hasDocTags: boolean;
+}
+
+export type ReferenceBindingKind = 'static' | 'dynamic' | 'computed';
+export type ReferenceConfidence = 'exact' | 'inferred' | 'heuristic' | 'unresolved';
+
+export interface ReferenceData {
+  repo: string;
+  filePath: string;
+  name: string;
+  bindingKind: ReferenceBindingKind;
+  isRead: boolean;
+  isWrite: boolean;
+  isCall: boolean;
+  line: number;
+  column: number;
+  confidence: ReferenceConfidence;
+}
+
 export interface ImportsEdgeProps {
   kind: 'value' | 'type' | 'namespace';
   specifiers: string[];
@@ -85,6 +127,9 @@ export interface ExtractionResult {
     symbolName: string;
     props: ExportsEdgeProps;
   }>;
+  scopes: ScopeData[];
+  comments: CommentData[];
+  references: ReferenceData[];
 }
 
 // ─── Behavioral extraction types ─────────────────────────────────────────────

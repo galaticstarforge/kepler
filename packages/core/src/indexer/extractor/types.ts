@@ -12,4 +12,11 @@ export type {
   CallSiteData,
   ImportsEdgeProps,
   ExportsEdgeProps,
+  ScopeData,
+  ScopeNodeKind,
+  CommentData,
+  CommentKind,
+  ReferenceData,
+  ReferenceBindingKind,
+  ReferenceConfidence,
 } from '@kepler/shared';

@@ -4,13 +4,18 @@ import ts from 'typescript';
 
 import type {
   CallSiteData,
+  CommentData,
+  CommentKind,
   ExternalPackageData,
   ExtractionResult,
   ImportsEdgeProps,
   ModuleData,
   ModuleSystem,
   Mutability,
+  ReferenceData,
+  ScopeData,
   ScopeKind,
+  ScopeNodeKind,
   SymbolData,
   SymbolKind,
 } from './types.js';
@@ -32,6 +37,12 @@ interface VisitorCtx {
   defaultExportedName: string | null;
   hasTopLevelSideEffect: boolean;
   seenPackages: Set<string>;
+  scopes: ScopeData[];
+  comments: CommentData[];
+  references: ReferenceData[];
+  seenCommentPositions: Set<number>;
+  scopeStack: string[];
+  nextScopeId: number;
 }
 
 export class JsExtractor {
@@ -60,7 +71,21 @@ export class JsExtractor {
       defaultExportedName: null,
       hasTopLevelSideEffect: false,
       seenPackages: new Set(),
+      scopes: [],
+      comments: [],
+      references: [],
+      seenCommentPositions: new Set(),
+      scopeStack: [],
+      nextScopeId: 0,
     };
+
+    // Module scope wraps everything.
+    const moduleScopeId = openScope(ctx, {
+      kind: 'module',
+      lineStart: 1,
+      lineEnd: sourceFile.getLineAndCharacterOfPosition(sourceFile.getEnd()).line + 1,
+      isStrict: sourceFileIsStrict(sourceFile, content),
+    });
 
     // Walk top-level statements
     for (const stmt of sourceFile.statements) {
@@ -69,6 +94,15 @@ export class JsExtractor {
 
     // Walk the entire file for call sites
     visitForCallSites(sourceFile, ctx);
+
+    // Walk the entire file for scope/reference primitives.
+    visitForScopes(sourceFile, ctx);
+    visitForReferences(sourceFile, ctx);
+
+    // Collect comments from the full text.
+    collectComments(sourceFile, content, ctx);
+
+    closeScope(ctx, moduleScopeId);
 
     // Resolve exports list from symbols
     resolveExports(ctx);
@@ -95,6 +129,9 @@ export class JsExtractor {
       localImports: ctx.localImports,
       callSites: ctx.callSites,
       exports: ctx.exports,
+      scopes: ctx.scopes,
+      comments: ctx.comments,
+      references: ctx.references,
     };
   }
 }
@@ -417,4 +454,270 @@ function extractPackageName(specifier: string): string {
   }
   // Handle path submodules like lodash/merge → lodash
   return specifier.split('/')[0] ?? specifier;
+}
+
+// ─── Scope emission ───────────────────────────────────────────────────────────
+
+interface ScopeOpenArgs {
+  kind: ScopeNodeKind;
+  lineStart: number;
+  lineEnd: number;
+  isStrict: boolean;
+}
+
+function openScope(ctx: VisitorCtx, args: ScopeOpenArgs): string {
+  const id = `s${ctx.nextScopeId++}`;
+  const parentId = ctx.scopeStack.at(-1) ?? null;
+  ctx.scopes.push({
+    repo: ctx.repo,
+    filePath: ctx.filePath,
+    kind: args.kind,
+    lineStart: args.lineStart,
+    lineEnd: args.lineEnd,
+    isStrict: args.isStrict,
+    id,
+    parentId,
+  });
+  ctx.scopeStack.push(id);
+  return id;
+}
+
+function closeScope(ctx: VisitorCtx, id: string): void {
+  const top = ctx.scopeStack.at(-1);
+  if (top === id) ctx.scopeStack.pop();
+}
+
+function sourceFileIsStrict(sourceFile: ts.SourceFile, content: string): boolean {
+  // ES modules are always strict — any import/export syntax marks the file as a module.
+  if ((sourceFile as unknown as { externalModuleIndicator?: ts.Node }).externalModuleIndicator) {
+    return true;
+  }
+  for (const stmt of sourceFile.statements) {
+    if (
+      stmt.kind === ts.SyntaxKind.ImportDeclaration ||
+      stmt.kind === ts.SyntaxKind.ExportDeclaration ||
+      stmt.kind === ts.SyntaxKind.ExportAssignment
+    ) {
+      return true;
+    }
+    if (ts.canHaveModifiers(stmt)) {
+      const mods = ts.getModifiers(stmt) ?? [];
+      if (mods.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) return true;
+    }
+  }
+  // "use strict" directive detection — look in the leading chunk only.
+  const head = content.slice(0, 200);
+  return /^[\s;]*(['"])use strict\1\s*;?/m.test(head);
+}
+
+function scopeKindForNode(node: ts.Node): ScopeNodeKind | null {
+  if (
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node) ||
+    ts.isConstructorDeclaration(node)
+  ) {
+    return 'function';
+  }
+  if (ts.isBlock(node)) {
+    // Skip Block when it's directly the body of a function-like — already represented.
+    const parent = node.parent;
+    if (
+      parent &&
+      (ts.isFunctionDeclaration(parent) ||
+        ts.isFunctionExpression(parent) ||
+        ts.isArrowFunction(parent) ||
+        ts.isMethodDeclaration(parent) ||
+        ts.isGetAccessorDeclaration(parent) ||
+        ts.isSetAccessorDeclaration(parent) ||
+        ts.isConstructorDeclaration(parent))
+    ) {
+      return null;
+    }
+    return 'block';
+  }
+  if (ts.isCatchClause(node)) return 'catch';
+  if (ts.isWithStatement(node)) return 'with';
+  return null;
+}
+
+function visitForScopes(sourceFile: ts.SourceFile, ctx: VisitorCtx): void {
+  const walk = (node: ts.Node): void => {
+    const kind = scopeKindForNode(node);
+    let opened: string | null = null;
+    if (kind) {
+      const { line, endLine } = lineRange(node, sourceFile);
+      opened = openScope(ctx, { kind, lineStart: line, lineEnd: endLine, isStrict: false });
+    }
+    ts.forEachChild(node, walk);
+    if (opened) closeScope(ctx, opened);
+  };
+  ts.forEachChild(sourceFile, walk);
+}
+
+// ─── Reference emission ───────────────────────────────────────────────────────
+
+function visitForReferences(sourceFile: ts.SourceFile, ctx: VisitorCtx): void {
+  const walk = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && !isDeclarationName(node)) {
+      const parent = node.parent;
+      const isCall = !!parent && (ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+        parent.expression === node;
+      const { isRead, isWrite } = classifyReadWrite(node);
+      const bindingKind: ReferenceData['bindingKind'] =
+        parent && ts.isElementAccessExpression(parent) && parent.argumentExpression === node
+          ? 'computed'
+          : 'static';
+      const pos = ts.getLineAndCharacterOfPosition(sourceFile, node.getStart(sourceFile));
+      ctx.references.push({
+        repo: ctx.repo,
+        filePath: ctx.filePath,
+        name: node.text,
+        bindingKind,
+        isRead,
+        isWrite,
+        isCall,
+        line: pos.line + 1,
+        column: pos.character + 1,
+        confidence: 'heuristic',
+      });
+    }
+    ts.forEachChild(node, walk);
+  };
+  ts.forEachChild(sourceFile, walk);
+}
+
+function isDeclarationName(id: ts.Identifier): boolean {
+  const parent = id.parent;
+  if (!parent) return false;
+  if (
+    (ts.isFunctionDeclaration(parent) ||
+      ts.isClassDeclaration(parent) ||
+      ts.isVariableDeclaration(parent) ||
+      ts.isParameter(parent) ||
+      ts.isMethodDeclaration(parent) ||
+      ts.isPropertyDeclaration(parent) ||
+      ts.isPropertyAssignment(parent) ||
+      ts.isBindingElement(parent) ||
+      ts.isImportClause(parent) ||
+      ts.isImportSpecifier(parent) ||
+      ts.isNamespaceImport(parent) ||
+      ts.isExportSpecifier(parent)) &&
+    (parent as { name?: ts.Node }).name === id
+  ) {
+    return true;
+  }
+  // Property access: `obj.foo` — `foo` is a property reference, not a declaration.
+  if (ts.isPropertyAccessExpression(parent) && parent.name === id) {
+    return false;
+  }
+  // Labelled statement label
+  if (ts.isLabeledStatement(parent) && parent.label === id) return true;
+  return false;
+}
+
+function classifyReadWrite(id: ts.Identifier): { isRead: boolean; isWrite: boolean } {
+  const parent = id.parent;
+  if (!parent) return { isRead: true, isWrite: false };
+  if (ts.isBinaryExpression(parent) && parent.left === id) {
+    const op = parent.operatorToken.kind;
+    if (op === ts.SyntaxKind.EqualsToken) return { isRead: false, isWrite: true };
+    if (
+      op === ts.SyntaxKind.PlusEqualsToken ||
+      op === ts.SyntaxKind.MinusEqualsToken ||
+      op === ts.SyntaxKind.AsteriskEqualsToken ||
+      op === ts.SyntaxKind.SlashEqualsToken ||
+      op === ts.SyntaxKind.PercentEqualsToken ||
+      op === ts.SyntaxKind.AmpersandEqualsToken ||
+      op === ts.SyntaxKind.BarEqualsToken ||
+      op === ts.SyntaxKind.CaretEqualsToken ||
+      op === ts.SyntaxKind.LessThanLessThanEqualsToken ||
+      op === ts.SyntaxKind.GreaterThanGreaterThanEqualsToken ||
+      op === ts.SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken ||
+      op === ts.SyntaxKind.AmpersandAmpersandEqualsToken ||
+      op === ts.SyntaxKind.BarBarEqualsToken ||
+      op === ts.SyntaxKind.QuestionQuestionEqualsToken
+    ) {
+      return { isRead: true, isWrite: true };
+    }
+  }
+  if (
+    (ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent)) &&
+    (parent.operator === ts.SyntaxKind.PlusPlusToken || parent.operator === ts.SyntaxKind.MinusMinusToken)
+  ) {
+    return { isRead: true, isWrite: true };
+  }
+  return { isRead: true, isWrite: false };
+}
+
+// ─── Comment emission ─────────────────────────────────────────────────────────
+
+function collectComments(sourceFile: ts.SourceFile, content: string, ctx: VisitorCtx): void {
+  // Shebang — first line only.
+  if (content.startsWith('#!')) {
+    const nl = content.indexOf('\n');
+    const end = nl === -1 ? content.length : nl;
+    ctx.comments.push({
+      repo: ctx.repo,
+      filePath: ctx.filePath,
+      kind: 'shebang',
+      text: content.slice(0, end),
+      lineStart: 1,
+      lineEnd: 1,
+      hasDocTags: false,
+    });
+    ctx.seenCommentPositions.add(0);
+  }
+
+  const walk = (node: ts.Node): void => {
+    const leading = ts.getLeadingCommentRanges(content, node.getFullStart());
+    if (leading) {
+      for (const range of leading) recordComment(range, content, sourceFile, ctx);
+    }
+    ts.forEachChild(node, walk);
+  };
+  ts.forEachChild(sourceFile, walk);
+
+  // Trailing comments at EOF aren't reached by walking; sweep the top.
+  const trailing = ts.getTrailingCommentRanges(content, sourceFile.getEnd());
+  if (trailing) {
+    for (const range of trailing) recordComment(range, content, sourceFile, ctx);
+  }
+}
+
+function recordComment(
+  range: ts.CommentRange,
+  content: string,
+  sourceFile: ts.SourceFile,
+  ctx: VisitorCtx,
+): void {
+  if (ctx.seenCommentPositions.has(range.pos)) return;
+  ctx.seenCommentPositions.add(range.pos);
+  const text = content.slice(range.pos, range.end);
+  const lineStart = ts.getLineAndCharacterOfPosition(sourceFile, range.pos).line + 1;
+  const lineEnd = ts.getLineAndCharacterOfPosition(sourceFile, range.end).line + 1;
+  const kind = classifyComment(text);
+  const hasDocTags = /@\w+/.test(text);
+  ctx.comments.push({
+    repo: ctx.repo,
+    filePath: ctx.filePath,
+    kind,
+    text: text.length > 2000 ? text.slice(0, 2000) : text,
+    lineStart,
+    lineEnd,
+    hasDocTags,
+  });
+}
+
+function classifyComment(text: string): CommentKind {
+  if (text.startsWith('//')) return 'line';
+  if (text.startsWith('/**')) return 'jsdoc';
+  if (text.startsWith('/*')) {
+    if (/copyright|license|spdx/i.test(text)) return 'license';
+    return 'block';
+  }
+  return 'block';
 }

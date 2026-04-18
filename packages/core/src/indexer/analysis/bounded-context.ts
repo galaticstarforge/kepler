@@ -1,5 +1,6 @@
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
+import type { Pass, PassContext, PassStats } from '../pass-runner.js';
 
 export interface BoundedContextDeclaration {
   contextId: string;
@@ -18,6 +19,12 @@ export interface BoundedContextDeclaration {
 export interface BoundedContextDeps {
   graph: GraphClient;
   logger?: Logger;
+  /**
+   * Returns the bounded-context declarations for the given repo. Typically
+   * sourced from `repos.yaml`. Returning an empty array is valid — the pass
+   * then creates no context nodes and skips tagging.
+   */
+  declarationsFor?: (repo: string) => BoundedContextDeclaration[];
 }
 
 export interface BoundedContextConfig {
@@ -42,11 +49,23 @@ export interface BoundedContextStats {
  *
  * See docs/graph/semantic-enrichment.md#bounded-context.
  */
-export class BoundedContextPass {
+export class BoundedContextPass implements Pass {
+  readonly name = 'bounded-context';
   private readonly log: Logger;
 
   constructor(private readonly deps: BoundedContextDeps) {
     this.log = deps.logger ?? createLogger('bounded-context');
+  }
+
+  async runFor(ctx: PassContext): Promise<PassStats | void> {
+    const fromConfig = parseDeclarations(
+      (ctx.config as { declarations?: unknown } | undefined)?.declarations,
+      ctx.repo,
+    );
+    const fromDeps = this.deps.declarationsFor?.(ctx.repo) ?? [];
+    const declarations = fromConfig.length > 0 ? fromConfig : fromDeps;
+    const stats = await this.run({ repo: ctx.repo, declarations });
+    return stats as unknown as PassStats;
   }
 
   async run(config: BoundedContextConfig): Promise<BoundedContextStats> {
@@ -163,4 +182,33 @@ export class BoundedContextPass {
     }
     return false;
   }
+}
+
+function parseDeclarations(raw: unknown, repo: string): BoundedContextDeclaration[] {
+  if (!Array.isArray(raw)) return [];
+  const out: BoundedContextDeclaration[] = [];
+  for (const [index, entry] of raw.entries()) {
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as {
+      contextId?: unknown;
+      name?: unknown;
+      description?: unknown;
+      patterns?: unknown;
+      declarationOrder?: unknown;
+    };
+    if (typeof e.contextId !== 'string' || e.contextId.length === 0) continue;
+    if (!Array.isArray(e.patterns)) continue;
+    const patterns = e.patterns.filter((p): p is string => typeof p === 'string');
+    if (patterns.length === 0) continue;
+    out.push({
+      contextId: e.contextId,
+      name: typeof e.name === 'string' ? e.name : e.contextId,
+      repo,
+      description: typeof e.description === 'string' ? e.description : '',
+      patterns,
+      declarationOrder:
+        typeof e.declarationOrder === 'number' ? e.declarationOrder : index,
+    });
+  }
+  return out;
 }

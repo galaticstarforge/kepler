@@ -1,5 +1,6 @@
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
+import type { Pass, PassContext, PassStats } from '../pass-runner.js';
 
 export interface PublicApiDeps {
   graph: GraphClient;
@@ -32,11 +33,17 @@ export interface PublicApiInput {
  *
  * See docs/graph/semantic-enrichment.md#public-surface-annotation.
  */
-export class PublicApiPass {
+export class PublicApiPass implements Pass {
+  readonly name = 'public-api';
   private readonly log: Logger;
 
   constructor(private readonly deps: PublicApiDeps) {
     this.log = deps.logger ?? createLogger('public-api');
+  }
+
+  async runFor(ctx: PassContext): Promise<PassStats | void> {
+    const stats = await this.run({ repo: ctx.repo });
+    return stats as unknown as PassStats;
   }
 
   async run(config: PublicApiConfig): Promise<PublicApiStats> {

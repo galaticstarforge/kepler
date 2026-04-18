@@ -2,6 +2,7 @@ import { simpleGit, type SimpleGit } from 'simple-git';
 
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
+import type { Pass, PassContext, PassStats } from '../pass-runner.js';
 
 export interface GitVolatilityDeps {
   graph: GraphClient;
@@ -49,11 +50,31 @@ const FORMAT = '%aI%x09%ae';
  * onto the symbols contained in those files. Granularity is file-level, not
  * symbol-level — see docs/graph/semantic-enrichment.md#git-derived-volatility-signals.
  */
-export class GitVolatilityPass {
+export class GitVolatilityPass implements Pass {
+  readonly name = 'git-volatility';
   private readonly log: Logger;
 
   constructor(private readonly deps: GitVolatilityDeps) {
     this.log = deps.logger ?? createLogger('git-volatility');
+  }
+
+  async runFor(ctx: PassContext): Promise<PassStats | void> {
+    const cfg = (ctx.config ?? {}) as {
+      frequencyWindowDays?: number;
+      authorWindowMonths?: number;
+    };
+    const passConfig: GitVolatilityConfig = {
+      repo: ctx.repo,
+      workingDir: ctx.workingDir,
+      ...(cfg.frequencyWindowDays === undefined
+        ? {}
+        : { frequencyWindowDays: cfg.frequencyWindowDays }),
+      ...(cfg.authorWindowMonths === undefined
+        ? {}
+        : { authorWindowMonths: cfg.authorWindowMonths }),
+    };
+    const stats = await this.run(passConfig);
+    return stats as unknown as PassStats;
   }
 
   async run(config: GitVolatilityConfig): Promise<GitVolatilityStats> {
