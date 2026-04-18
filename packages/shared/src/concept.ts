@@ -56,3 +56,39 @@ export interface EnrichmentRunRecord {
   stats: EnrichmentRunStats;
   error?: string;
 }
+
+// ─── Doc-graph reconciler types ──────────────────────────────────────────────
+
+export type DocGraphRunStatus = 'running' | 'completed' | 'failed';
+
+export type ReferenceChannel = 'frontmatter' | 'inline-code' | 'fenced-import' | 'graph-link';
+
+export interface UnresolvedReference {
+  docPath: string;
+  candidateName: string;
+  channel: ReferenceChannel;
+  reason: string;
+}
+
+export interface DocGraphRunStats {
+  docsScanned: number;
+  docsSkipped: number;
+  referencesFound: number;
+  referencesResolved: number;
+  referencesUnresolved: number;
+  edgesWritten: number;
+  docsUpdated: number;
+  errors: string[];
+}
+
+/** Run record persisted under `doc-graph-runs/_runs/<runId>.json`. */
+export interface DocGraphRunRecord {
+  runId: string;
+  status: DocGraphRunStatus;
+  startedAt: string;
+  finishedAt?: string;
+  durationMs?: number;
+  stats: DocGraphRunStats;
+  unresolvedReferences: UnresolvedReference[];
+  error?: string;
+}

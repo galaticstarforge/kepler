@@ -64,6 +64,19 @@ export async function adminDiagnostics(
     checks['configuredRepos'] = ctx.orchestrator.configuredRepos();
   }
 
+  // Doc-graph unresolved references from the most recent run.
+  if (ctx.docGraphReconciler) {
+    try {
+      const unresolved = await ctx.docGraphReconciler.latestUnresolved();
+      checks['docGraphUnresolvedCount'] = unresolved.length;
+      if (unresolved.length > 0) {
+        checks['docGraphUnresolvedSample'] = unresolved.slice(0, 10);
+      }
+    } catch {
+      checks['docGraphError'] = 'failed to fetch unresolved references';
+    }
+  }
+
   const allOk = neo4jOk;
   return structuredResponse(
     { status: allOk ? 'ok' : 'degraded', checks },

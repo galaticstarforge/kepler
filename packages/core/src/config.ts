@@ -36,8 +36,18 @@ export interface ConceptExtractionConfig {
   region?: string;
 }
 
+export interface DocGraphCronConfig {
+  /** Minutes between scheduled runs. 0 disables scheduled runs. */
+  scheduleMinutes: number;
+  /** When true, rewrite "Related Code" sections in markdown files. */
+  updateRelatedCodeSections: boolean;
+  /** Minimum confidence score (0–1) for repo-wide fuzzy matches to produce edges. */
+  fuzzyConfidenceThreshold: number;
+}
+
 export interface EnrichmentConfig {
   conceptExtraction: ConceptExtractionConfig;
+  docGraphCron: DocGraphCronConfig;
 }
 
 export interface SummarizationEmbeddingConfig {
@@ -181,6 +191,11 @@ const DEFAULT_CONFIG: CoreConfig = {
       embeddingModel: 'amazon.titan-embed-text-v2:0',
       similarityThreshold: 0.88,
       minDocChars: 400,
+    },
+    docGraphCron: {
+      scheduleMinutes: 0,
+      updateRelatedCodeSections: false,
+      fuzzyConfidenceThreshold: 0.6,
     },
   },
   summarization: {
@@ -342,6 +357,10 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
       conceptExtraction: {
         ...defaults.enrichment.conceptExtraction,
         ...(enrichment?.['conceptExtraction'] as Partial<ConceptExtractionConfig> | undefined),
+      },
+      docGraphCron: {
+        ...defaults.enrichment.docGraphCron,
+        ...(enrichment?.['docGraphCron'] as Partial<DocGraphCronConfig> | undefined),
       },
     },
     summarization: mergeSummarization(defaults.summarization, summarization),
