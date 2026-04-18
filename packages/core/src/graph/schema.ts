@@ -16,4 +16,5 @@ export const CORE_INDEX_STATEMENTS: readonly string[] = [
   'CREATE INDEX external_package_lookup IF NOT EXISTS FOR (p:ExternalPackage) ON (p.name)',
   'CREATE INDEX flag_name IF NOT EXISTS FOR (f:FlagDefinition) ON (f.repo, f.name)',
   'CREATE INDEX external_service_name IF NOT EXISTS FOR (e:ExternalService) ON (e.repo, e.name)',
+  'CREATE INDEX community_repo IF NOT EXISTS FOR (c:Community) ON (c.repo, c.communityId)',
 ];

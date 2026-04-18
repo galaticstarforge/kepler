@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
+import type { Pass, PassContext, PassStats } from '../pass-runner.js';
 
 export interface ContentHashDeps {
   graph: GraphClient;
@@ -40,11 +41,17 @@ interface SymbolLookup {
  *
  * See docs/graph/semantic-enrichment.md#staleness-detection.
  */
-export class SymbolContentHashPass {
+export class SymbolContentHashPass implements Pass {
+  readonly name = 'symbol-content-hash';
   private readonly log: Logger;
 
   constructor(private readonly deps: ContentHashDeps) {
     this.log = deps.logger ?? createLogger('symbol-content-hash');
+  }
+
+  async runFor(ctx: PassContext): Promise<PassStats | void> {
+    const stats = await this.run({ repo: ctx.repo, workingDir: ctx.workingDir });
+    return stats as unknown as PassStats;
   }
 
   async run(config: ContentHashConfig): Promise<ContentHashStats> {
