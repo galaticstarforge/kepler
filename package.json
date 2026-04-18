@@ -1,6 +1,6 @@
 {
   "name": "kepler-monorepo",
-  "private": true,
+  "private": false,
   "type": "module",
   "packageManager": "pnpm@9.15.4",
   "engines": {
