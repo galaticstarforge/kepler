@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { GraphClient } from '../../src/graph/graph-client.js';
-import { StructuralMetricsPass } from '../../src/indexer/analysis/structural-metrics.js';
 import { SymbolContentHashPass } from '../../src/indexer/analysis/content-hash.js';
+import { StructuralMetricsPass } from '../../src/indexer/analysis/structural-metrics.js';
 import type { PassContext } from '../../src/indexer/pass-runner.js';
 import { createLogger } from '../../src/logger.js';
 
@@ -152,7 +152,7 @@ describe('StructuralMetricsPass', () => {
     });
 
     // threshold set to 10% — 8% delta should skip
-    const ctx = makeCtx({ graph, config: { edgeDeltaThreshold: 0.10 } });
+    const ctx = makeCtx({ graph, config: { edgeDeltaThreshold: 0.1 } });
     const result = await pass.runFor(ctx) as Record<string, unknown>;
     expect(runSpy).not.toHaveBeenCalled();
     expect(result).toMatchObject({ skipped: true });
