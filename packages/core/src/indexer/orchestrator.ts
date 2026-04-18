@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import type { BaseExtractorConfig, OrchestratorConfig } from '../config.js';
@@ -9,12 +10,14 @@ import { BehavioralAnalyzer } from './extractor/behavioral-analyzer.js';
 import { GraphWriter } from './extractor/graph-writer.js';
 import { JsExtractor } from './extractor/js-extractor.js';
 import { FileDiscovery } from './file-discovery.js';
+import type { PassRunner } from './pass-runner.js';
 
 export interface OrchestratorDeps {
   watcher: GitRepoWatcher;
   graph: GraphClient;
   config: OrchestratorConfig;
   extractorConfig: BaseExtractorConfig;
+  passRunner?: PassRunner;
   logger?: Logger;
 }
 
@@ -125,5 +128,24 @@ export class Orchestrator {
     }
 
     this.log.info('indexing complete', { repo: repo.name, indexed, errors });
+
+    if (this.deps.passRunner) {
+      const traceId = randomUUID();
+      try {
+        await this.deps.passRunner.runAll({
+          repo: repo.name,
+          workingDir,
+          traceId,
+        });
+      } catch (error) {
+        // Plan/config errors (cycles, unknown deps) surface here. Individual
+        // pass failures are absorbed by the PassRunner and recorded.
+        this.log.error('pass runner failed', {
+          repo: repo.name,
+          traceId,
+          error: String(error),
+        });
+      }
+    }
   }
 }
