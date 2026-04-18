@@ -20,6 +20,9 @@ const EXPECTED_INDEX_NAMES = [
   'symbol_name_ft',
   'comment_text_ft',
   'literal_value_ft',
+  'community_repo',
+  'bounded_context_lookup',
+  'architectural_layer_lookup',
 ];
 
 describe.skipIf(!LIVE)('GraphClient (live Neo4j — opt-in via KEPLER_TEST_NEO4J=1)', () => {

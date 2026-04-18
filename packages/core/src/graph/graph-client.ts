@@ -57,6 +57,49 @@ export class GraphClient {
     }
   }
 
+  /**
+   * Returns the running server's version string (e.g. `'5.14.0'`). Uses the
+   * `dbms.components()` procedure which is always available in Neo4j 3.x+.
+   */
+  async serverVersion(): Promise<string> {
+    const session = this.driver.session({ database: this.database, defaultAccessMode: neo4j.session.READ });
+    try {
+      const result = await session.run('CALL dbms.components() YIELD versions RETURN versions[0] AS version');
+      const record = result.records[0];
+      if (!record) throw new Error('dbms.components() returned no rows');
+      const version = record.get('version');
+      if (typeof version !== 'string' || version.length === 0) {
+        throw new Error('dbms.components() returned no version string');
+      }
+      return version;
+    } finally {
+      await session.close();
+    }
+  }
+
+  /**
+   * Returns state information for the named indexes. Missing indexes are
+   * omitted. `state` values mirror Neo4j's `SHOW INDEXES` output
+   * (`ONLINE`, `POPULATING`, `FAILED`).
+   */
+  async indexStates(names: readonly string[]): Promise<Array<{ name: string; state: string; type: string }>> {
+    if (names.length === 0) return [];
+    const session = this.driver.session({ database: this.database, defaultAccessMode: neo4j.session.READ });
+    try {
+      const result = await session.run(
+        'SHOW INDEXES YIELD name, state, type WHERE name IN $names RETURN name, state, type',
+        { names: [...names] },
+      );
+      return result.records.map((r) => ({
+        name: String(r.get('name')),
+        state: String(r.get('state')),
+        type: String(r.get('type')),
+      }));
+    } finally {
+      await session.close();
+    }
+  }
+
   async runRead<T>(
     cypher: string,
     params: Record<string, unknown> = {},

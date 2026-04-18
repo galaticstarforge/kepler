@@ -40,6 +40,23 @@ export interface EnrichmentConfig {
   conceptExtraction: ConceptExtractionConfig;
 }
 
+export interface SummarizationEmbeddingConfig {
+  /** Embedding model identifier, e.g. `amazon.titan-embed-text-v2:0`. */
+  model: string;
+  /** Must match the dimensionality produced by `model`. Drives the vector indexes. */
+  dimensions: number;
+}
+
+export interface SummarizationConfig {
+  /** Model used for navigation/tool-use. */
+  navigationModel: string;
+  /** Model used to produce canonical summaries. */
+  summaryModel: string;
+  embedding: SummarizationEmbeddingConfig;
+  /** Cost ceiling (USD) for a single summarization run. 0 disables the check. */
+  maxRunCostUSD: number;
+}
+
 export interface SourceAccessConfig {
   enabled: boolean;
   cloneRoot: string;
@@ -87,6 +104,7 @@ export interface CoreConfig {
     logLevel: 'debug' | 'info' | 'warn' | 'error';
   };
   enrichment: EnrichmentConfig;
+  summarization: SummarizationConfig;
   sourceAccess: SourceAccessConfig;
   orchestrator: OrchestratorConfig;
   baseExtractor: BaseExtractorConfig;
@@ -110,6 +128,15 @@ const DEFAULT_CONFIG: CoreConfig = {
       similarityThreshold: 0.88,
       minDocChars: 400,
     },
+  },
+  summarization: {
+    navigationModel: 'anthropic.claude-3-5-haiku-20241022-v1:0',
+    summaryModel: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    embedding: {
+      model: 'amazon.titan-embed-text-v2:0',
+      dimensions: 1536,
+    },
+    maxRunCostUSD: 0,
   },
   sourceAccess: {
     enabled: false,
@@ -169,12 +196,29 @@ function mergeOrchestrator(
   };
 }
 
+function mergeSummarization(
+  defaults: SummarizationConfig,
+  raw: Partial<SummarizationConfig> | undefined,
+): SummarizationConfig {
+  if (!raw) return { ...defaults, embedding: { ...defaults.embedding } };
+  return {
+    navigationModel: raw.navigationModel ?? defaults.navigationModel,
+    summaryModel: raw.summaryModel ?? defaults.summaryModel,
+    embedding: {
+      ...defaults.embedding,
+      ...(raw.embedding as Partial<SummarizationEmbeddingConfig> | undefined),
+    },
+    maxRunCostUSD: raw.maxRunCostUSD ?? defaults.maxRunCostUSD,
+  };
+}
+
 function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreConfig {
   const system = raw['system'] as Partial<CoreConfig['system']> | undefined;
   const storage = raw['storage'] as Record<string, unknown> | undefined;
   const mcp = raw['mcp'] as Partial<CoreConfig['mcp']> | undefined;
   const observability = raw['observability'] as Partial<CoreConfig['observability']> | undefined;
   const enrichment = raw['enrichment'] as Record<string, unknown> | undefined;
+  const summarization = raw['summarization'] as Partial<SummarizationConfig> | undefined;
   const sourceAccess = raw['sourceAccess'] as Partial<SourceAccessConfig> | undefined;
   const orchestrator = raw['orchestrator'] as Partial<OrchestratorConfig> | undefined;
   const baseExtractor = raw['baseExtractor'] as Partial<BaseExtractorConfig> | undefined;
@@ -203,6 +247,7 @@ function mergeConfig(defaults: CoreConfig, raw: Record<string, unknown>): CoreCo
         ...(enrichment?.['conceptExtraction'] as Partial<ConceptExtractionConfig> | undefined),
       },
     },
+    summarization: mergeSummarization(defaults.summarization, summarization),
     sourceAccess: { ...defaults.sourceAccess, ...sourceAccess },
     orchestrator: mergeOrchestrator(defaults.orchestrator, orchestrator),
     baseExtractor: { ...defaults.baseExtractor, ...baseExtractor },

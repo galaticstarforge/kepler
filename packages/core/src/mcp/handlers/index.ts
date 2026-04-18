@@ -14,6 +14,7 @@ import { docsRead } from './docs-read.js';
 import { docsSearch } from './docs-search.js';
 import { docsUpdate } from './docs-update.js';
 import { graphQuery } from './graph-query.js';
+import { graphSemanticSearch } from './graph-semantic-search.js';
 
 export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   'docs.create': docsCreate,
@@ -30,4 +31,5 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   'admin.enrichmentRun': adminEnrichmentRun,
   'admin.enrichmentStatus': adminEnrichmentStatus,
   'graph.query': graphQuery,
+  'graph.semanticSearch': graphSemanticSearch,
 };
