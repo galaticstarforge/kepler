@@ -1,5 +1,6 @@
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
+import type { Pass, PassContext, PassStats } from '../pass-runner.js';
 
 export type ArchitecturalLayerName =
   | 'api'
@@ -90,11 +91,23 @@ const ALL_LAYER_NAMES: readonly ArchitecturalLayerName[] = [
  *
  * See docs/graph/semantic-enrichment.md#architectural-layer.
  */
-export class ArchitecturalLayerPass {
+export class ArchitecturalLayerPass implements Pass {
+  readonly name = 'architectural-layer';
   private readonly log: Logger;
 
   constructor(private readonly deps: LayerClassificationDeps) {
     this.log = deps.logger ?? createLogger('architectural-layer');
+  }
+
+  async runFor(ctx: PassContext): Promise<PassStats | void> {
+    const cfg = (ctx.config ?? {}) as { rules?: unknown };
+    const rules = Array.isArray(cfg.rules) ? parseRules(cfg.rules) : undefined;
+    const passConfig: LayerClassificationConfig = {
+      repo: ctx.repo,
+      ...(rules === undefined ? {} : { rules }),
+    };
+    const stats = await this.run(passConfig);
+    return stats as unknown as PassStats;
   }
 
   async run(config: LayerClassificationConfig): Promise<LayerClassificationStats> {
@@ -179,4 +192,30 @@ export class ArchitecturalLayerPass {
     );
     return rows[0] ?? 0;
   }
+}
+
+function parseRules(raw: unknown[]): LayerRule[] {
+  const parsed: LayerRule[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const r = entry as {
+      pattern?: unknown;
+      layer?: unknown;
+      priority?: unknown;
+      source?: unknown;
+    };
+    if (typeof r.pattern !== 'string' || typeof r.layer !== 'string') continue;
+    const layer = r.layer as ArchitecturalLayerName;
+    let pattern: RegExp;
+    try {
+      pattern = new RegExp(r.pattern);
+    } catch {
+      continue;
+    }
+    const rule: LayerRule = { pattern, layer };
+    if (typeof r.priority === 'number') rule.priority = r.priority;
+    if (typeof r.source === 'string') rule.source = r.source;
+    parsed.push(rule);
+  }
+  return parsed;
 }

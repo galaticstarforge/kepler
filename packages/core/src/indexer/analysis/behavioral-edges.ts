@@ -1,5 +1,6 @@
 import type { GraphClient } from '../../graph/graph-client.js';
 import { createLogger, type Logger } from '../../logger.js';
+import type { Pass, PassContext, PassStats } from '../pass-runner.js';
 
 export type ThrowConfidence = 'exact' | 'inferred' | 'heuristic';
 export type ConfigAccessPattern = 'direct' | 'dynamic';
@@ -55,11 +56,30 @@ const DEFAULT_INTEGRATION_PATTERNS: RegExp[] = [
  *
  * See docs/graph/behavioral-extraction.md#edge-types-added.
  */
-export class BehavioralEdgesWriter {
+export class BehavioralEdgesWriter implements Pass {
+  readonly name = 'behavioral-edges';
   private readonly log: Logger;
 
   constructor(private readonly deps: BehavioralEdgesDeps) {
     this.log = deps.logger ?? createLogger('behavioral-edges');
+  }
+
+  async runFor(ctx: PassContext): Promise<PassStats | void> {
+    const cfg = (ctx.config ?? {}) as {
+      throwsPropagationDepth?: number;
+      testAssertsSymbolCap?: number;
+    };
+    const passConfig: BehavioralEdgesConfig = {
+      repo: ctx.repo,
+      ...(cfg.throwsPropagationDepth === undefined
+        ? {}
+        : { throwsPropagationDepth: cfg.throwsPropagationDepth }),
+      ...(cfg.testAssertsSymbolCap === undefined
+        ? {}
+        : { testAssertsSymbolCap: cfg.testAssertsSymbolCap }),
+    };
+    const stats = await this.run(passConfig);
+    return stats as unknown as PassStats;
   }
 
   async run(config: BehavioralEdgesConfig): Promise<BehavioralEdgesStats> {

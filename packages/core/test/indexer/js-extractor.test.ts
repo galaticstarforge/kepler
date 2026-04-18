@@ -281,4 +281,100 @@ export function foo() {}
       expect(result.module.path).toBe('lib/index.js');
     });
   });
+
+  describe('scopes', () => {
+    it('emits a module scope wrapping the file', () => {
+      const result = extract(`export const x = 1;`);
+      const moduleScope = result.scopes.find((s) => s.kind === 'module');
+      expect(moduleScope).toBeDefined();
+      expect(moduleScope!.parentId).toBeNull();
+      expect(moduleScope!.isStrict).toBe(true);
+    });
+
+    it('emits a function scope parented to the module scope', () => {
+      const result = extract(`function foo() { return 1; }`);
+      const moduleScope = result.scopes.find((s) => s.kind === 'module');
+      const fnScope = result.scopes.find((s) => s.kind === 'function');
+      expect(fnScope).toBeDefined();
+      expect(fnScope!.parentId).toBe(moduleScope!.id);
+    });
+
+    it('emits a catch scope for try/catch', () => {
+      const result = extract(`function f() { try { g(); } catch (e) { h(e); } }`);
+      const catchScope = result.scopes.find((s) => s.kind === 'catch');
+      expect(catchScope).toBeDefined();
+    });
+
+    it('emits a block scope for standalone braces', () => {
+      const result = extract(`if (true) { const x = 1; }`);
+      const blockScope = result.scopes.find((s) => s.kind === 'block');
+      expect(blockScope).toBeDefined();
+    });
+  });
+
+  describe('references', () => {
+    it('records identifier reads', () => {
+      const result = extract(`function f() { return foo; }`);
+      const refs = result.references.filter((r) => r.name === 'foo');
+      expect(refs).toHaveLength(1);
+      expect(refs[0].isRead).toBe(true);
+      expect(refs[0].isWrite).toBe(false);
+      expect(refs[0].isCall).toBe(false);
+    });
+
+    it('marks call targets', () => {
+      const result = extract(`function f() { foo(); }`);
+      const callRefs = result.references.filter((r) => r.name === 'foo' && r.isCall);
+      expect(callRefs).toHaveLength(1);
+    });
+
+    it('marks writes from assignment', () => {
+      const result = extract(`function f() { x = 1; }`);
+      const writes = result.references.filter((r) => r.name === 'x' && r.isWrite);
+      expect(writes).toHaveLength(1);
+      expect(writes[0].isRead).toBe(false);
+    });
+
+    it('marks compound-assignment as both read and write', () => {
+      const result = extract(`function f() { x += 1; }`);
+      const refs = result.references.filter((r) => r.name === 'x');
+      expect(refs).toHaveLength(1);
+      expect(refs[0].isRead).toBe(true);
+      expect(refs[0].isWrite).toBe(true);
+    });
+
+    it('skips declaration identifiers', () => {
+      const result = extract(`function foo() {}`);
+      expect(result.references.filter((r) => r.name === 'foo')).toHaveLength(0);
+    });
+  });
+
+  describe('comments', () => {
+    it('captures line comments', () => {
+      const result = extract(`// hello\nexport const x = 1;`);
+      const line = result.comments.find((c) => c.kind === 'line');
+      expect(line).toBeDefined();
+      expect(line!.text).toContain('hello');
+    });
+
+    it('captures jsdoc with doc tags', () => {
+      const result = extract(`/** @param {number} n */\nfunction f(n) {}`);
+      const jsdoc = result.comments.find((c) => c.kind === 'jsdoc');
+      expect(jsdoc).toBeDefined();
+      expect(jsdoc!.hasDocTags).toBe(true);
+    });
+
+    it('tags copyright block comments as license', () => {
+      const result = extract(`/* Copyright 2026 Acme */\nexport const x = 1;`);
+      const lic = result.comments.find((c) => c.kind === 'license');
+      expect(lic).toBeDefined();
+    });
+
+    it('captures shebang lines', () => {
+      const result = extract(`#!/usr/bin/env node\nexport const x = 1;`);
+      const shebang = result.comments.find((c) => c.kind === 'shebang');
+      expect(shebang).toBeDefined();
+      expect(shebang!.lineStart).toBe(1);
+    });
+  });
 });
