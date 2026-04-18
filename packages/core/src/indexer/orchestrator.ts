@@ -44,6 +44,14 @@ export class Orchestrator {
     this.log.info('stopped');
   }
 
+  inFlightRepos(): string[] {
+    return [...this.inFlight.keys()];
+  }
+
+  configuredRepos(): string[] {
+    return this.deps.watcher.repos().map((r) => r.name);
+  }
+
   private handleRepoUpdate(event: RepoUpdateEvent): void {
     const repoName = event.repo.name;
 

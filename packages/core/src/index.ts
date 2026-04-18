@@ -27,7 +27,9 @@ import {
 } from './indexer/analysis/index.js';
 import { DocumentStorePassRunHistoryStore, Orchestrator, PassRunner } from './indexer/index.js';
 import { createLogger, setLogLevel } from './logger.js';
+import { AuthStore } from './mcp/auth-store.js';
 import { McpRouter } from './mcp/mcp-router.js';
+import { RateLimiter } from './mcp/rate-limiter.js';
 import { GitRepoWatcher } from './repos/git-repo-watcher.js';
 import { loadReposConfig } from './repos/repos-config.js';
 import { EmbeddingModelRatchet } from './semantic/embedding-model-ratchet.js';
@@ -203,6 +205,22 @@ if (config.sourceAccess.enabled && config.orchestrator.enabled && repoWatcher) {
   orchestrator.start();
 }
 
+// Auth store and rate limiter (no-ops when auth is disabled).
+const authStore = new AuthStore(config.auth);
+const rateLimiter = new RateLimiter(config.rateLimits);
+
+// Pass run history store for admin.passRunHistory.
+const passRunHistoryStore = new DocumentStorePassRunHistoryStore(store);
+
+// Build the OrchestratorHandle for admin tools (null when orchestrator is not running).
+const _orch = orchestrator;
+const orchestratorHandle = _orch
+  ? {
+      inFlightRepos: () => _orch.inFlightRepos(),
+      configuredRepos: () => _orch.configuredRepos(),
+    }
+  : null;
+
 // Create MCP router with handler context.
 const router = new McpRouter({
   store,
@@ -213,6 +231,8 @@ const router = new McpRouter({
   enrichmentRunner,
   logger: createLogger('mcp'),
   vectorIndexReadiness,
+  passRunHistory: passRunHistoryStore,
+  orchestrator: orchestratorHandle,
 });
 
 // Create and start HTTP server.
@@ -222,6 +242,8 @@ const server = createHttpServer({
   deploymentName: DEPLOYMENT_NAME,
   router,
   logger: createLogger('http'),
+  authStore,
+  rateLimiter,
   readinessProbe: async () => {
     const snapshot = await vectorIndexReadiness.snapshot();
     return {

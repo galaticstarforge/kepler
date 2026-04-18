@@ -4,8 +4,14 @@ import type { TemplateManager } from '../docs/template-manager.js';
 import type { ConceptStore } from '../enrichment/concept-store.js';
 import type { EnrichmentRunner } from '../enrichment/enrichment-runner.js';
 import type { GraphClient } from '../graph/graph-client.js';
+import type { PassRunHistoryStore } from '../indexer/pass-run-history-store.js';
 import type { Logger } from '../logger.js';
 import type { VectorIndexReadiness } from '../semantic/vector-index-readiness.js';
+
+export interface OrchestratorHandle {
+  inFlightRepos(): string[];
+  configuredRepos(): string[];
+}
 
 export interface HandlerContext {
   store: DocumentStore;
@@ -16,6 +22,10 @@ export interface HandlerContext {
   enrichmentRunner: EnrichmentRunner;
   logger: Logger;
   vectorIndexReadiness?: VectorIndexReadiness;
+  passRunHistory?: PassRunHistoryStore;
+  orchestrator?: OrchestratorHandle | null;
+  /** Populated per-request by McpRouter before calling handlers. */
+  traceId: string;
 }
 
 export interface McpContentBlock {

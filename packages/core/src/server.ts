@@ -1,7 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
+import type { AuthStore } from './mcp/auth-store.js';
+import type { McpRequest, McpResponse, RequestMeta } from './mcp/mcp-router.js';
+import { McpRouter } from './mcp/mcp-router.js';
+import type { RateLimiter } from './mcp/rate-limiter.js';
 import type { Logger } from './logger.js';
-import { McpRouter, type McpRequest, type McpResponse } from './mcp/mcp-router.js';
 
 export interface ReadinessProbeResult {
   ready: boolean;
@@ -17,10 +21,31 @@ export interface ServerDeps {
   router: McpRouter;
   logger: Logger;
   readinessProbe?: ReadinessProbe;
+  authStore?: AuthStore;
+  rateLimiter?: RateLimiter;
+}
+
+/** Extract `Bearer <token>` from the Authorization header. */
+function extractBearer(req: IncomingMessage): string | null {
+  const header = req.headers['authorization'];
+  if (!header || !header.startsWith('Bearer ')) return null;
+  return header.slice('Bearer '.length).trim() || null;
+}
+
+function mcpErrorResponse(
+  id: string | number | undefined,
+  code: number,
+  message: string,
+  httpStatus: number,
+): { body: string; status: number } {
+  const payload: McpResponse = { id, error: { code, message } };
+  return { body: JSON.stringify(payload), status: httpStatus };
 }
 
 export function createHttpServer(deps: ServerDeps) {
   const startTime = Date.now();
+  // Active SSE connections: sessionId → response stream.
+  const sseConnections = new Map<string, ServerResponse>();
 
   function uptimeSeconds(): number {
     return Math.floor((Date.now() - startTime) / 1000);
@@ -29,7 +54,9 @@ export function createHttpServer(deps: ServerDeps) {
   async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const start = performance.now();
     const method = req.method || 'GET';
-    const path = req.url || '/';
+    const rawPath = req.url || '/';
+    // Strip query string for routing.
+    const path = rawPath.split('?')[0] ?? rawPath;
 
     let status = 200;
     let body: string;
@@ -61,12 +88,117 @@ export function createHttpServer(deps: ServerDeps) {
         ].join('\n') + '\n';
         break;
       }
+
+      case '/mcp/sse': {
+        if (method !== 'GET') {
+          status = 405;
+          body = JSON.stringify({ error: 'Method not allowed. Use GET for SSE.' });
+          break;
+        }
+        // Auth check for SSE connections.
+        if (deps.authStore?.enabled) {
+          const token = extractBearer(req);
+          if (!token) {
+            const { body: b, status: s } = mcpErrorResponse(
+              undefined, -32_001, 'Unauthorized: missing Bearer token', 401,
+            );
+            res.writeHead(s, { 'Content-Type': 'application/json' });
+            res.end(b);
+            return;
+          }
+          const validated = deps.authStore.validate(token);
+          if (!validated) {
+            const { body: b, status: s } = mcpErrorResponse(
+              undefined, -32_001, 'Unauthorized: invalid or unknown token', 401,
+            );
+            res.writeHead(s, { 'Content-Type': 'application/json' });
+            res.end(b);
+            return;
+          }
+        }
+
+        const sessionId = randomUUID();
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+          'X-Session-Id': sessionId,
+        });
+
+        // Send endpoint event so MCP clients know where to POST requests.
+        res.write(`event: endpoint\ndata: ${JSON.stringify({ url: '/mcp', sessionId })}\n\n`);
+
+        sseConnections.set(sessionId, res);
+
+        // Keep-alive heartbeat every 30 s.
+        const heartbeat = setInterval(() => {
+          if (!res.writableEnded) {
+            res.write(': keepalive\n\n');
+          } else {
+            clearInterval(heartbeat);
+          }
+        }, 30_000);
+
+        req.on('close', () => {
+          clearInterval(heartbeat);
+          sseConnections.delete(sessionId);
+          deps.logger.debug('sse connection closed', { sessionId });
+        });
+
+        const duration = (performance.now() - start).toFixed(2);
+        deps.logger.info('request', { method, path, status: 200, durationMs: Number(duration) });
+        return;
+      }
+
       case '/mcp': {
         if (method !== 'POST') {
           status = 405;
           body = JSON.stringify({ error: 'Method not allowed. Use POST.' });
           break;
         }
+
+        // Auth enforcement.
+        let requestMeta: RequestMeta = {};
+        if (deps.authStore?.enabled) {
+          const token = extractBearer(req);
+          if (!token) {
+            const { body: b, status: s } = mcpErrorResponse(
+              undefined, -32_001, 'Unauthorized: missing Bearer token', 401,
+            );
+            res.writeHead(s, { 'Content-Type': 'application/json' });
+            res.end(b);
+            return;
+          }
+          const validated = deps.authStore.validate(token);
+          if (!validated) {
+            const { body: b, status: s } = mcpErrorResponse(
+              undefined, -32_001, 'Unauthorized: invalid or unknown token', 401,
+            );
+            res.writeHead(s, { 'Content-Type': 'application/json' });
+            res.end(b);
+            return;
+          }
+
+          // Rate-limit check.
+          if (deps.rateLimiter) {
+            const rl = deps.rateLimiter.check(validated.name);
+            if (!rl.allowed) {
+              const msg = `Rate limited. Retry after ${rl.retryAfter} second(s).`;
+              const { body: b, status: s } = mcpErrorResponse(undefined, -32_029, msg, 429);
+              res.writeHead(s, {
+                'Content-Type': 'application/json',
+                'Retry-After': String(rl.retryAfter),
+              });
+              res.end(b);
+              return;
+            }
+          }
+
+          requestMeta = { scopes: validated.scopes };
+        }
+
+        const traceId = randomUUID();
+        requestMeta.traceId = traceId;
 
         const mcpBody = await readBody(req);
         let mcpRequest: McpRequest;
@@ -78,7 +210,9 @@ export function createHttpServer(deps: ServerDeps) {
           break;
         }
 
-        const mcpResponse: McpResponse = await deps.router.handleRequest(mcpRequest);
+        deps.logger.debug('mcp request', { traceId, method: mcpRequest.method, id: mcpRequest.id });
+
+        const mcpResponse: McpResponse = await deps.router.handleRequest(mcpRequest, requestMeta);
         if (mcpResponse.httpStatus) {
           status = mcpResponse.httpStatus;
         } else if (mcpResponse.error) {
@@ -89,8 +223,18 @@ export function createHttpServer(deps: ServerDeps) {
         const wireResponse: Record<string, unknown> = { ...mcpResponse };
         delete wireResponse['httpStatus'];
         body = JSON.stringify(wireResponse);
+
+        // If request came from an SSE session, also forward response over the stream.
+        const sessionId = req.headers['x-session-id'] as string | undefined;
+        if (sessionId) {
+          const sseRes = sseConnections.get(sessionId);
+          if (sseRes && !sseRes.writableEnded) {
+            sseRes.write(`event: message\ndata: ${body}\n\n`);
+          }
+        }
         break;
       }
+
       default: {
         status = 404;
         body = JSON.stringify({ error: 'not found' });
