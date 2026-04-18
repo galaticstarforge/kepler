@@ -7,6 +7,7 @@ import { TemplateManager } from './docs/template-manager.js';
 import { ConceptExtractor } from './enrichment/concept-extractor.js';
 import { ConceptStore } from './enrichment/concept-store.js';
 import { EnrichmentRunner } from './enrichment/enrichment-runner.js';
+import { BedrockLlmClient } from './enrichment/llm/bedrock-llm-client.js';
 import { createLlmClient } from './enrichment/llm/llm-factory.js';
 import { createGraphClient } from './graph/graph-client-factory.js';
 import {
@@ -37,6 +38,9 @@ import { createSemanticIndex } from './semantic/semantic-index-factory.js';
 import { VectorIndexReadiness } from './semantic/vector-index-readiness.js';
 import { createHttpServer } from './server.js';
 import { createDocumentStore } from './storage/document-store-factory.js';
+import { SummarizationAgent } from './summarization/agent.js';
+import { SummarizationScheduler } from './summarization/scheduler.js';
+import { GitSourceAccess } from './summarization/source-access.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -205,6 +209,52 @@ if (config.sourceAccess.enabled && config.orchestrator.enabled && repoWatcher) {
   orchestrator.start();
 }
 
+// Summarization agent (requires source access + LLM provider).
+let summarizationAgent: SummarizationAgent | null = null;
+let summarizationScheduler: SummarizationScheduler | null = null;
+if (config.sourceAccess.enabled && config.enrichment.conceptExtraction.provider !== 'none') {
+  const sourceAccess = new GitSourceAccess(config.sourceAccess.cloneRoot);
+  const summarizationRegion = config.storage.semanticIndex.region ?? REGION;
+  const navigationLlm = new BedrockLlmClient({
+    region: summarizationRegion,
+    completionModel: config.summarization.navigationModel,
+    embeddingModel: config.summarization.embedding.model,
+  });
+  const summaryLlm = new BedrockLlmClient({
+    region: summarizationRegion,
+    completionModel: config.summarization.summaryModel,
+    embeddingModel: config.summarization.embedding.model,
+  });
+  summarizationAgent = new SummarizationAgent({
+    graph,
+    store,
+    sourceAccess,
+    navigationLlm,
+    summaryLlm,
+    logger: createLogger('summarization-agent'),
+    priorityWeights: config.summarization.priorityWeights,
+  });
+  summarizationScheduler = new SummarizationScheduler({
+    agent: summarizationAgent,
+    logger: createLogger('summarization-scheduler'),
+  });
+  if (loadedReposConfig && loadedReposConfig.repos.length > 0) {
+    const firstRepo = loadedReposConfig.repos[0]!;
+    summarizationScheduler.start({
+      scheduleMinutes: config.summarization.scheduleMinutes,
+      agentConfig: {
+        repo: firstRepo.name,
+        mode: 'incremental',
+        embeddingModel: config.summarization.embedding.model,
+        maxRunCostUSD: config.summarization.maxRunCostUSD,
+      },
+    });
+  }
+} else {
+  // SourceAccess still needed by the no-op path for the handler context.
+  // Nothing to wire.
+}
+
 // Auth store and rate limiter (no-ops when auth is disabled).
 const authStore = new AuthStore(config.auth);
 const rateLimiter = new RateLimiter(config.rateLimits);
@@ -233,6 +283,9 @@ const router = new McpRouter({
   vectorIndexReadiness,
   passRunHistory: passRunHistoryStore,
   orchestrator: orchestratorHandle,
+  summarizationAgent,
+  summarizationEmbeddingModel: config.summarization.embedding.model,
+  maxRunCostUSD: config.summarization.maxRunCostUSD,
 });
 
 // Create and start HTTP server.
@@ -244,6 +297,7 @@ const server = createHttpServer({
   logger: createLogger('http'),
   authStore,
   rateLimiter,
+  summarizationAgent,
   readinessProbe: async () => {
     const snapshot = await vectorIndexReadiness.snapshot();
     return {
@@ -259,6 +313,7 @@ const server = createHttpServer({
 
 function shutdown(signal: string): void {
   log.info('shutdown', { signal });
+  summarizationScheduler?.stop();
   orchestrator?.stop();
   repoWatcher?.stop();
   server.close(() => {

@@ -7,6 +7,7 @@ import type { GraphClient } from '../graph/graph-client.js';
 import type { PassRunHistoryStore } from '../indexer/pass-run-history-store.js';
 import type { Logger } from '../logger.js';
 import type { VectorIndexReadiness } from '../semantic/vector-index-readiness.js';
+import type { SummarizationAgent } from '../summarization/agent.js';
 
 export interface OrchestratorHandle {
   inFlightRepos(): string[];
@@ -24,6 +25,11 @@ export interface HandlerContext {
   vectorIndexReadiness?: VectorIndexReadiness;
   passRunHistory?: PassRunHistoryStore;
   orchestrator?: OrchestratorHandle | null;
+  summarizationAgent?: SummarizationAgent | null;
+  /** Embedding model identifier forwarded to the agent for SymbolSummary nodes. */
+  summarizationEmbeddingModel?: string;
+  /** Per-run cost ceiling forwarded to the agent. */
+  maxRunCostUSD?: number;
   /** Populated per-request by McpRouter before calling handlers. */
   traceId: string;
 }
